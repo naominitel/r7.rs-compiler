@@ -6,7 +6,7 @@ module Tree
 import Data.List
 import Lexer
 
--- Basic representation of the program before parsing
+-- Basic representation of the program after first phase of parsing
 -- Tree where leaf/nodes are tokens with their contents and positions attached
 
 data TokenTree 

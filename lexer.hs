@@ -12,6 +12,7 @@ module Lexer
         TokLet,  
         TokInt, 
         TokBool,
+        TokQuote,
         TokStr,
         TokOther
     ),
@@ -22,6 +23,7 @@ module Lexer
 ) where
 
 import Control.Monad.Instances
+import Data.Word
 import Text.Regex.Posix
 
 -- Pos: position of a token in the file (Line, Column)
@@ -43,8 +45,9 @@ data Token
     | TokIf Pos
     | TokLambda Pos
     | TokLet Pos
-    | TokInt Int Pos
+    | TokInt Word32 Pos
     | TokBool Bool Pos
+    | TokQuote Pos
     | TokStr String Pos
     | TokOther String Pos
 
@@ -99,7 +102,7 @@ tokenize ("if", p)     = TokIf p
 tokenize ("#t", p)     = TokBool True p
 tokenize ("#f", p)     = TokBool False p
 tokenize (s, p)
-    | s =~ "^[0-9]+$"           = TokInt (read s :: Int) p
+    | s =~ "^[0-9]+$"           = TokInt (read s :: Word32) p
     -- | s =~ "\"(\\.|[^\\"])*\""  = TokStr (read s :: String) p
     | otherwise                 = TokOther s p
 
