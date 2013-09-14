@@ -5,13 +5,10 @@ import System.IO
 import AST
 import Bytecode
 import Compiler
+import Config
 import Lexer
 import Parser
 import Serialize
-
--- store informations parsed from command line
-
-type Config = Map String String
 
 -- printUsage: print help about program options
 
@@ -36,10 +33,10 @@ parseCommandArgs (arg:rest) =
     case arg of
         "-h" -> fail ""
         "-o" -> case rest of
-            (val:r) -> parseCommandArgs r >>= return . insert "OutFile" val
+            (val:r) -> parseCommandArgs r >>= return . configSetString OutFile val
             _       -> fail $ "Missing parameter to -o"
-        "-s" -> parseCommandArgs rest >>= return . insert "AssembleOnly" "True"
-        _    -> parseCommandArgs rest >>= return . insert "InFile" arg
+        "-s" -> parseCommandArgs rest >>= return . configSet AssembleOnly
+        _    -> parseCommandArgs rest >>= return . configSetString InFile arg
 
 -- writeProgram: write assembly program (for use with -s)
 
@@ -59,22 +56,20 @@ main = do
             printUsage 
             print err
         Right config ->
-            case Map.lookup "InFile" config of
+            case configLookupString config InFile of
                 Nothing -> do
                     printUsage
                     print "Error: no input file specified"
                 Just fp -> do
                     print $ "Compiling file " ++ fp
-                    outf <- openFile (case Map.lookup "OutFile" config of
-                        Just fp -> fp
-                        Nothing -> "out.bin") WriteMode
+                    outf <- openFile (configLookupDefaultString config OutFile "out.bin") WriteMode
                     h <- openFile fp ReadMode
                     contents <- hGetContents h 
                     let prog = program contents
                     let toks = lexer prog
-                    writef <- return $ case Map.lookup "AssembleOnly" config of
-                        Just _ -> Main.writeProgram
-                        Nothing -> Serialize.writeProgram
+                    writef <- return $ case configLookup config AssembleOnly of
+                        True -> Main.writeProgram
+                        False -> Serialize.writeProgram
                     case parser toks of
                         Left err -> print err
                         Right (AST ast) -> case codegen ast ([], 0) of
