@@ -23,9 +23,9 @@ type LetArgs = [(Token, TokenTree)]
 -- e.g. ((e1 v1) (e2 v2)) -> [(e1, v1), (e2, v2)]
 
 letArgs :: [TokenTree] -> Either String LetArgs
-letArgs []                                                 = return []
-letArgs (TokNode (TokLeaf t@(TokOther _ _):val:[]) : rest) = letArgs rest >>= return . (:) (t, val)
-letArgs _                                                  = fail "Malformed let parameter list"
+letArgs []                                              = return []
+letArgs (TokNode (TokLeaf t@(TokId _ _):val:[]) : rest) = letArgs rest >>= return . (:) (t, val)
+letArgs _                                               = fail "Malformed let parameter list"
 
 -- return the list of identifiers of the formal let args 
 -- e.g. [e1, e2, ..., en]
@@ -46,5 +46,5 @@ letArgsValues ((i, tree) : r) = letArgsValues r >>= return . (:) tree
 
 lambdaArgs :: [TokenTree] -> Either String [String]
 lambdaArgs [] = return []
-lambdaArgs (TokLeaf (TokOther arg _) : r) = (lambdaArgs r) >>= return . (:) arg
-lambdaArgs a = trace (show a) $ fail "Malformed lambda parameter list"
+lambdaArgs (TokLeaf (TokId arg _) : r) = (lambdaArgs r) >>= return . (:) arg
+lambdaArgs a = fail "Malformed lambda parameter list"

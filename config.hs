@@ -1,13 +1,19 @@
 module Config
 (
     Config,
-    ConfigKey(AssembleOnly, OutFile, InFile),
-    configLookup,
-    configLookupString,
-    configLookupDefaultString,
-    configSet,
-    configUnset,
-    configSetString
+    ConfigKey
+    (
+        AssembleOnly, 
+        OutFile, 
+        InFile, 
+        LogVerbose
+    ),
+    Config.lookup,
+    lookupStr,
+    lookupDefaultStr,
+    set,
+    unset,
+    setStr
 ) where
 
 import Data.Map
@@ -18,6 +24,7 @@ data ConfigKey
     = AssembleOnly
     | OutFile
     | InFile
+    | LogVerbose
 
 data ConfigValue
      = ConfigString String
@@ -34,6 +41,7 @@ hashWithSalt :: Int -> ConfigKey -> Int
 hashWithSalt _ AssembleOnly = 0
 hashWithSalt _ OutFile = 1
 hashWithSalt _ InFile = 2
+hashWithSalt _ LogVerbose = 3
 
 instance Eq ConfigKey where
     key1 == key2 = ((hashWithSalt 0 key1) == (hashWithSalt 0 key2))
@@ -43,33 +51,33 @@ instance Ord ConfigKey where
 
 -- Lookup functions
 
-configLookup :: Config -> ConfigKey -> Bool
-configLookup cnf key = case Data.Map.lookup key cnf of
+lookup :: Config -> ConfigKey -> Bool
+lookup cnf key = case Data.Map.lookup key cnf of
     Just _ -> True
     Nothing -> False
 
-configLookupDefault :: Config -> ConfigKey -> ConfigValue -> ConfigValue
-configLookupDefault cnf key def = case Data.Map.lookup key cnf of
+lookupDefault :: Config -> ConfigKey -> ConfigValue -> ConfigValue
+lookupDefault cnf key def = case Data.Map.lookup key cnf of
     Just val -> val
     Nothing -> def
 
-configLookupString :: Config -> ConfigKey -> Maybe String
-configLookupString cnf key = case Data.Map.lookup key cnf of
+lookupStr :: Config -> ConfigKey -> Maybe String
+lookupStr cnf key = case Data.Map.lookup key cnf of
     Just (ConfigString str) -> Just str
     _ -> Nothing
 
-configLookupDefaultString :: Config -> ConfigKey -> String -> String
-configLookupDefaultString cnf key def = case configLookupString cnf key of
+lookupDefaultStr :: Config -> ConfigKey -> String -> String
+lookupDefaultStr cnf key def = case lookupStr cnf key of
     Just str -> str
     Nothing -> def
 
 -- Set an option in the map (boolean)
 
-configSet :: ConfigKey -> Config -> Config
-configSet key cnf = insert key (ConfigEmpty) cnf 
+set :: ConfigKey -> Config -> Config
+set key cnf = insert key (ConfigEmpty) cnf 
 
-configUnset :: ConfigKey -> Config -> Config
-configUnset key cnf = delete key cnf
+unset :: ConfigKey -> Config -> Config
+unset key cnf = delete key cnf
 
-configSetString :: ConfigKey -> String -> Config -> Config
-configSetString key val cnf = insert key (ConfigString val) cnf
+setStr :: ConfigKey -> String -> Config -> Config
+setStr key val cnf = insert key (ConfigString val) cnf

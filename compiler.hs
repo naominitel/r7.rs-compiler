@@ -2,6 +2,7 @@ module Compiler
 (
     Env,
     CompilerState,
+    initialState,
     primFetch,
     envFetch,
     nextLabel,
@@ -15,7 +16,7 @@ import Data.Word
 -- This module contains various definition for code generation
 
 type Env = [String]
-type CompilerState = (Env, Word32)
+type CompilerState = ([Env], Word32)
 
 -- Initial compiler state at the beginning of the compilation
 
@@ -40,8 +41,11 @@ primFetch s = envSearch s primEnv 0
 
 -- return the position of an identifier in the lexical environment
 
-envFetch :: String -> Env -> Maybe Int
-envFetch s e = envSearch s e 0
+envFetch :: String -> [Env] -> Maybe Int
+envFetch _ [] = Nothing
+envFetch s (e:r) = case envSearch s e 0 of
+    Just l -> Just l
+    Nothing -> envFetch s r >>= Just . (+ (length e))
 
 -- return a new usable label depending on the current label
 
@@ -51,9 +55,11 @@ nextLabel (env, lbl) = (lbl, (env, lbl + 1))
 -- returns a new compiler state by adding an environment to the lexical env.
 
 envExtend :: Env -> CompilerState -> CompilerState
-envExtend e1 (e2, lbl) = (e1 ++ e2, lbl)
+envExtend e1 (e2, lbl) = (e1:e2, lbl)
 
 -- basic class for expressions that can be compiled
 
 class (Show a) => Expression a where
     codegen :: a -> CompilerState -> Either String ([Instr], CompilerState)
+
+    

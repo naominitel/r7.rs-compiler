@@ -1,6 +1,6 @@
 module Constant
 (
-    Constant(IntConstant, BoolConstant)
+    Constant(IntConstant, BoolConstant, Symbol)
 ) where
 
 import Data.Word
@@ -15,12 +15,14 @@ import Lexer
 data Constant 
     = IntConstant Word32 Pos
     | BoolConstant Bool Pos
+    | Symbol String Pos
 
 instance Show Constant where
     show (IntConstant i _) = show i
     show (BoolConstant b _) = show b
+    show (Symbol s _) = show s
  
 instance Expression Constant where
     codegen (IntConstant i _) st = return ([Push $ TInt i], st)
     codegen (BoolConstant b _) st = return ([Push $ TBool b], st)
-    
+    codegen (Symbol s _) st = return ([Push $ TSym s], st)

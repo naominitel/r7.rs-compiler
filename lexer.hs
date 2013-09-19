@@ -6,6 +6,7 @@ module Lexer
     (
         TokOpen, 
         TokClose, 
+        TokBegin,
         TokDefine,
         TokIf, 
         TokLambda,
@@ -14,12 +15,13 @@ module Lexer
         TokBool,
         TokQuote,
         TokStr,
-        TokOther
+        TokId
     ),
 
     lexer, 
     program,
-    syntaxChecker
+    syntaxChecker,
+    tokPos
 ) where
 
 import Control.Monad.Instances
@@ -41,6 +43,7 @@ instance Show Pos where
 data Token 
     = TokOpen Pos 
     | TokClose Pos
+    | TokBegin Pos
     | TokDefine Pos
     | TokIf Pos
     | TokLambda Pos
@@ -49,19 +52,31 @@ data Token
     | TokBool Bool Pos
     | TokQuote Pos
     | TokStr String Pos
-    | TokOther String Pos
+    | TokId String Pos
 
 instance Show Token where
-    show (TokOpen pos)    = "Open "  ++ show pos
-    show (TokClose pos)   = "Close " ++ show pos
-    show (TokDefine pos)  = "define " ++ show pos
-    show (TokIf pos)      = "if " ++ show pos
-    show (TokLambda pos)  = "lambda " ++ show pos
-    show (TokLet pos)     = "let " ++ show pos
+    show (TokOpen pos)    = "Open"
+    show (TokClose pos)   = "Close"
+    show (TokDefine pos)  = "define"
+    show (TokIf pos)      = "if"
+    show (TokLambda pos)  = "lambda"
+    show (TokLet pos)     = "let"
     show (TokInt i pos)   = show i
     show (TokBool b pos)  = show b
     show (TokStr s pos)   = show s
-    show (TokOther t pos) = t ++ " " ++ show pos
+    show (TokId t pos)    = t
+
+tokPos :: Token -> Pos
+tokPos (TokOpen pos)    = pos
+tokPos (TokClose pos)   = pos
+tokPos (TokDefine pos)  = pos
+tokPos (TokIf pos)      = pos
+tokPos (TokLambda pos)  = pos
+tokPos (TokLet pos)     = pos
+tokPos (TokInt _ pos)   = pos  
+tokPos (TokBool _ pos)  = pos
+tokPos (TokStr _ pos)   = pos
+tokPos (TokId _ pos)    = pos
 
 -- Program
 
@@ -78,46 +93,65 @@ newline (Pos l c) = (Pos (l + 1) c)
 
 -- cut: split the program into string tokens
 
+separator :: Char -> Bool
+separator c 
+    | [c] =~ "[ \t\r\n()]" = True
+    | otherwise          = False
+
 cut :: Program -> [(String, Pos)]
 
-cut ('(':s, pos)   = ("(", pos) : cut (s, forward pos)
-cut (')':s, pos)   = (")", pos) : cut (s, forward pos)
-cut (' ':s, pos)   = cut (s, forward pos)
-cut (a:'(':s, pos) = ([a], pos) : cut ('(':s, forward pos)
-cut (a:')':s, pos) = ([a], pos) : cut (')':s, forward pos)
-cut (a:' ':s, pos) = ([a], pos) : cut (' ':s, forward pos)
-cut (a:[], pos)    = ([a], pos) : []
-cut ([], pos)      = []
-cut (a:s, pos)     = let ((n,p):r) = cut (s, forward pos) in (a:n, pos):r
+cut ([], pos)       = []
+cut ('(':s, pos)    = ("(", pos) : cut (s, forward pos)
+cut (')':s, pos)    = (")", pos) : cut (s, forward pos)
+cut ('\n':s, pos)   = cut (s, newline pos)
+cut ('\t':s, pos)   = cut (s, forward pos)
+cut ('\r':s, pos)   = cut (s, forward pos)
+cut (' ':s, pos)    = cut (s, forward pos)
+cut (a:[], pos)     = ([a], pos) : []
+cut (a:c:s, pos)
+    | separator c   = ([a], pos) : cut (c:s, forward pos)
+    | otherwise     = let ((n,p):r) = cut (c:s, forward pos) in (a:n, pos):r
+
+-- Regular expressions used to tokenize the program
+
+identifier = "^(([a-zA-Z!$%&*/:<=>?^_`][a-zA-Z!$%&*/:<=>?^_`+\\-\\.@0-9]*)\ 
+    \|(\\+|\\-|\\.\\.\\.))$"
+
+integer = "^[0-9]+$"
+string = "\"(\\.|[^\\\\\"])*\""
+
 
 -- Tokenize: core of the lexer, transforms the program into a token list
 
-tokenize :: (String, Pos) -> Token
-tokenize ("(", p)      = TokOpen p
-tokenize (")", p)      = TokClose p
-tokenize ("let", p)    = TokLet p
-tokenize ("lambda", p) = TokLambda p
-tokenize ("define", p) = TokDefine p
-tokenize ("if", p)     = TokIf p
-tokenize ("#t", p)     = TokBool True p
-tokenize ("#f", p)     = TokBool False p
+tokenize :: (String, Pos) -> Either String Token
+tokenize ("(", p)      = Right $ TokOpen p
+tokenize (")", p)      = Right $ TokClose p
+tokenize ("let", p)    = Right $ TokLet p
+tokenize ("lambda", p) = Right $ TokLambda p
+tokenize ("define", p) = Right $ TokDefine p
+tokenize ("begin", p)  = Right $ TokBegin p
+tokenize ("quote", p)  = Right $ TokQuote p
+tokenize ("if", p)     = Right $ TokIf p
+tokenize ("#t", p)     = Right $ TokBool True p
+tokenize ("#f", p)     = Right $ TokBool False p
 tokenize (s, p)
-    | s =~ "^[0-9]+$"           = TokInt (read s :: Word32) p
-    -- | s =~ "\"(\\.|[^\\"])*\""  = TokStr (read s :: String) p
-    | otherwise                 = TokOther s p
-
+    | s =~ integer     = Right $ TokInt (read s :: Word32) p
+    | s =~ string      = Right $ TokStr (read s :: String) p
+    | s =~ identifier  = Right $ TokId s p
+    | otherwise        = Left $ "Unknown token " ++ s ++ " at " ++ show p
+     
 -- Check if the pairs of parenthesis are correct
 
 syntaxChecker :: [Token] -> Int -> Either String [Token]
-syntaxChecker [] 0                         = Right []
-syntaxChecker [] _                         = fail "Unclosed parenthesis at end of input"
-syntaxChecker (tok@(TokClose p):rest) count
-    | (count > 0)                          = (syntaxChecker rest $ count - 1) >>= Right . (:) tok
-    | otherwise                            = fail $ "Unexpected ')' at " ++ show p
-syntaxChecker (tok@(TokOpen p):rest) count = (syntaxChecker rest $ count + 1) >>= Right . (:) tok
-syntaxChecker (tok:rest) count             = (syntaxChecker rest $ count) >>= Right . (:) tok
+syntaxChecker [] 0                = Right []
+syntaxChecker [] _                = Left "Unclosed parenthesis at end of input"
+syntaxChecker (t@(TokOpen _):r) c = syntaxChecker r (c + 1) >>= Right . (:) t
+syntaxChecker (t@(TokClose p):r) c
+    | (c > 0)                     = syntaxChecker r (c - 1) >>= Right . (:) t
+    | otherwise                   = Left $ "Unexpected ')' at " ++ show p
+syntaxChecker (t:r) count         = syntaxChecker r count >>= Right . (:) t
 
 -- entry point for the lexer
 
-lexer :: Program -> [Token]
-lexer prog = map tokenize $ cut prog
+lexer :: Program -> Either String [Token]
+lexer prog = mapM tokenize $ cut prog

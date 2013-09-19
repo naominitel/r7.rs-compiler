@@ -13,9 +13,11 @@ import Control.Monad.Instances
 
 import Apply
 import AST
+import Begin
 import Bytecode
 import Compiler
 import Constant
+import Datum
 import Define
 import Identifier
 import If
@@ -91,23 +93,30 @@ expand (TokNode (TokLeaf (TokLet p) : _)) =
 
 expand (TokNode (TokLeaf (TokLambda p) : (TokNode lst) : expr : [])) =
     let args = lambdaArgs lst
-        lbda = ((args >>= return . Lambda) <*> expand expr <*> return p)
+        lbda = (args >>= return . Lambda) <*> expand expr <*> return p
     in lbda >>= return . AST
+
+-- Parsing for (lambda (e1 ... en) expr1 ... exprn) (implicit begin)
+
+expand (TokNode (lbd@(TokLeaf (TokLambda p)) : args@(TokNode lst) : exprs)) = 
+    let begin  = TokNode $ (TokLeaf $ (TokBegin p)) : exprs
+        lambda = TokNode $ [lbd, args, begin]
+    in expand lambda
 
 expand (TokNode (TokLeaf (TokLambda p) : _)) = 
     fail $ "Malformed lambda-expr at " ++ show p
 
 -- Parsing for (define id val)
 
-expand (TokNode (TokLeaf (TokDefine _) : (TokLeaf (TokOther i p)) : expr : [])) =
+expand (TokNode (TokLeaf (TokDefine _) : (TokLeaf (TokId i p)) : expr : [])) =
     expand expr >>= \e -> return $ AST $ Define i e p
 
 -- Parsing for (define (id args) val) -> (define id (lambda (args)) val)
 
-expand (TokNode (TokLeaf (TokDefine _) : (TokNode (TokLeaf (TokOther i p) : args)) : expr : [])) =
+expand (TokNode (TokLeaf (TokDefine _) : (TokNode (TokLeaf (TokId i p) : args)) : expr : [])) =
     let lambda = (TokNode (TokLeaf (TokLambda p) : (TokNode args) : expr : []))
         parsedLambda = expand lambda
-    in (parsedLambda >>= \l -> return $ AST $ Define i l p)
+    in parsedLambda >>= \l -> return $ AST $ Define i l p
 
 expand (TokNode (TokLeaf (TokDefine p) : _)) = 
     fail $ "Malformed define expression at " ++ show p
@@ -122,15 +131,21 @@ expand (TokNode (TokLeaf (TokIf p) : exprif : expr1 : expr2 : [])) =
     in ifexpr >>= return . AST
 
 expand (TokNode (TokLeaf (TokIf p) : _)) =
-    fail $ "Malformed if-expression at " ++ show p
+    Left $ "Malformed if-expression at " ++ show p
 
 -- Parsing for (quote expr)
 
 expand (TokNode (TokLeaf (TokQuote p) : expr : [])) = 
-    return $ AST $ Quote expr p
+    return $ AST $ Quote (getDatum expr) p
 
 expand (TokNode (TokLeaf (TokQuote p) : _)) =
     fail $ "Malformed quote-expression at " ++ show p
+
+-- Parsing for (begin expr)
+
+expand (TokNode (TokLeaf (TokBegin p) : exprs)) =
+    let parsedExprs = mapM expand exprs
+    in parsedExprs >>= \e -> return $ AST $ Begin e p
 
 -- Parsing for function application (f a1 a2 a3)
 
@@ -144,13 +159,13 @@ expand (TokNode (func : args)) =
 
 expand (TokLeaf (TokBool b p))  = return $ AST $ BoolConstant b p
 expand (TokLeaf (TokInt i p))   = return $ AST $ IntConstant i p
-expand (TokLeaf (TokOther s p)) = return $ AST $ Identifier s p
+expand (TokLeaf (TokId s p)) = return $ AST $ Identifier s p
 
 -- parser: entry point for the parser
 
-parser :: [Token] -> Either String AST
+parser :: [Token] -> Either String [AST]
 
 parser tokens = 
     case arborize tokens of
-        (exprs, []) -> expand $ exprs !! 0 -- Fixme: should be map expand exprs
+        (exprs, []) -> mapM expand exprs -- Fixme: should be map expand exprs
         (_, _) -> fail "Parse error: extra tokens after parenthesis"

@@ -34,7 +34,7 @@ compileArgs ((AST a) : rest) st =
 --   <compilation of b>
 --   <compilation of a>
 --   <compilation of the f expression>
---   CALL 3
+--   CALL 3             
 
 instance Expression Apply where
     codegen (Apply (AST f) parms p) st = 
