@@ -30,11 +30,12 @@ import Bytecode
 -- computes the length (bytes) of the serialized version of a single instruction
 
 serializedLength :: Instr -> Word32
-serializedLength (Label _) = 0
-serializedLength (Return)  = 1
-serializedLength (Pop)     = 1
-serializedLength (Push _)  = 6
-serializedLength _         = 5
+serializedLength (Label _)      = 0
+serializedLength (Return)       = 1
+serializedLength (Pop)          = 1
+serializedLength (Push (TUnit)) = 2
+serializedLength (Push _)       = 6
+serializedLength _              = 5
 
 -- associates a label number to its adress inside the program
 
@@ -153,7 +154,7 @@ serialize (instr:rest) lbls symbols =
 -- creates the header to be written at the beginning of the file
 -- the header follow the following structure: 
 --      * Magic: 0x2A 0x2A 0x2A
---      * size of the symbol section, 32 bits little-endian
+--      * number of symbols in the symbol section, 32 bits little-endian
 --      * size of the program section, 32 bits little-endian
 
 createHeader :: Word32 -> Word32 -> Put
@@ -200,9 +201,9 @@ writeProgram :: [Instr] -> Handle -> IO ()
 writeProgram prog h = do
     let symbols   = getSymbols prog
     let sym_table = BS.concat $ BL.toChunks $ runPut $ createSymbolTable symbols
-    let symt_size = (fromIntegral (BS.length sym_table) :: Word32)
-    let labels    = getLabels prog symt_size
+    let symt_len  = (fromIntegral (Prelude.length [elems symbols]) :: Word32)
+    let labels    = getLabels prog 0
     let program   = BS.concat $ serialize prog labels symbols
     let prog_size = (fromIntegral (BS.length program) :: Word32)
-    let header    = BL.toChunks $ runPut $ createHeader symt_size prog_size
+    let header    = BL.toChunks $ runPut $ createHeader symt_len prog_size
     BS.hPutStr h $ BS.concat $ (header ++ [sym_table] ++ [program])
