@@ -26,7 +26,8 @@ initialState = ([], 0)
 -- Global environment for containing primitives
 
 primEnv :: [String]
-primEnv = ["+"]
+primEnv = ["+", "-", "*", "/", "=", "list", "cons", "car", "cdr",
+        "display", "newline", "set-car!", "set-cdr!"]
 
 -- utility function used by primFetch or envFetch to return the index of an item
 
