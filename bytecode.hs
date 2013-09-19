@@ -64,8 +64,8 @@ _CALL   = 0x06 :: Word8
 _RETURN = 0x07 :: Word8
 _FETCH  = 0x08 :: Word8
 _BRANCH = 0x09 :: Word8
-_STORE  = 0x10 :: Word8
-_ALLOC  = 0x12 :: Word8
+_STORE  = 0x0A :: Word8
+_ALLOC  = 0x0C :: Word8
 
 -- dump asm instructions
 
