@@ -154,16 +154,27 @@ serialize (instr:rest) lbls symbols =
 -- creates the header to be written at the beginning of the file
 -- the header follow the following structure: 
 --      * Magic: 0x2A 0x2A 0x2A
---      * number of symbols in the symbol section, 32 bits little-endian
---      * size of the program section, 32 bits little-endian
+--      * Version number of the file format
+--      * 28 bits reserved for future format extension
+--      * offset of symbol section, 64 bits big-endian
+--      * offset of imports section, 64 bits big-endian
+--      * offset of exports section, 64 bits big-endian
+--      * offset of the program section, 64 bits big-endian
 
-createHeader :: Word32 -> Word32 -> Put
-createHeader sym_size prog_size = do
+createHeader :: Word64 -> Word64 -> Word64 -> Word64 -> Put
+createHeader sym_off imp_off exp_off prog_off = do
     putWord8    0x2A
     putWord8    0x2A
     putWord8    0x2A
-    putWord32le sym_size
-    putWord32le prog_size -- $ programLength i
+    putWord8    0x01
+    putWord32be 0xFFFFFFFF
+    putWord64be 0xFFFFFFFFFFFFFFFF
+    putWord64be 0xFFFFFFFFFFFFFFFF
+    putWord64be 0xFFFFFFFFFFFFFFFF
+    putWord64be sym_off
+    putWord64be imp_off
+    putWord64be exp_off
+    putWord64be prog_off
 
 -- creates the symbol table to be written at the beginning of the file 
 -- the symbol table follows the following form for each symbol: 
@@ -175,6 +186,15 @@ createHeader sym_size prog_size = do
 toAscii :: String -> [Word8]
 toAscii []    = []
 toAscii (c:s) = (fromIntegral (ord c) :: Word8) : toAscii s
+
+-- creates the imports offset
+-- FIXME: creates an empty section for now
+
+createImportSection :: [String] -> Put
+createImportSection _ = putWord64be 0
+
+createExportSection :: [String] -> Put
+createExportSection _ = putWord64be 0
 
 -- creates the symbol table
 
@@ -197,13 +217,46 @@ createSymbolTable set =
 --      * Creates the header
 --      * Writes to file
 
+-- align an offset on 0x10-boundaries
+
+alignOffset :: Word64 -> Word64
+alignOffset off = off - (off `mod` 0x10) + 0x10
+
 writeProgram :: [Instr] -> Handle -> IO ()
 writeProgram prog h = do
     let symbols   = getSymbols prog
+
+    let sym_off   = 0x40 -- header_size
     let sym_table = BS.concat $ BL.toChunks $ runPut $ createSymbolTable symbols
-    let symt_len  = (fromIntegral (Prelude.length [elems symbols]) :: Word32)
+    let symt_len  = (fromIntegral (BS.length sym_table) :: Word64)
+
+    let imp_off   = alignOffset $ sym_off + symt_len
+    let imports   = BS.concat $ BL.toChunks $ runPut $ createImportSection []
+    let imp_len   = (fromIntegral (BS.length imports) :: Word64)
+
+    let exp_off   = alignOffset $ imp_off + imp_len
+    let exports   = BS.concat $ BL.toChunks $ runPut $ createExportSection []
+    let exp_len   = (fromIntegral (BS.length exports) :: Word64)
+
+    let text_off  = alignOffset $ exp_off + exp_len
     let labels    = getLabels prog 0
     let program   = BS.concat $ serialize prog labels symbols
-    let prog_size = (fromIntegral (BS.length program) :: Word32)
-    let header    = BL.toChunks $ runPut $ createHeader symt_len prog_size
-    BS.hPutStr h $ BS.concat $ (header ++ [sym_table] ++ [program])
+    let prog_size = (fromIntegral (BS.length program) :: Word64)
+
+    let hdr       = createHeader sym_off imp_off exp_off text_off
+    let header    = BS.concat $ BL.toChunks $ runPut hdr
+
+    BS.hPutStr h header
+
+    hSeek h AbsoluteSeek $ fromIntegral sym_off
+    BS.hPutStr h sym_table
+
+    hSeek h AbsoluteSeek $ fromIntegral imp_off
+    BS.hPutStr h imports
+
+    hSeek h AbsoluteSeek $ fromIntegral exp_off
+    BS.hPutStr h exports
+
+    hSeek h AbsoluteSeek $ fromIntegral text_off
+    BS.hPutStr h $ BS.concat $ BL.toChunks $ runPut $ putWord64be prog_size
+    BS.hPutStr h program
