@@ -69,7 +69,7 @@ getSymbols (_:rest) = getSymbols rest
 
 -- find the index of a symbol in the symbol table
 
-symbolIndex :: String -> Symbols -> Word32
+symbolIndex :: String -> Symbols -> Word64
 symbolIndex s set = 
     let aux l i = case l of
             [] -> 0 -- FIXME: should be an error
@@ -82,11 +82,11 @@ serializeValue :: Type -> Labels -> Symbols -> Put
 
 serializeValue (TBool b) _ _ = do
     putWord8    _BOOL
-    putWord32le (if b then 1 else 0)
+    putWord8    (if b then 1 else 0)
 
 serializeValue (TInt i) _ _ = do
     putWord8    _INT
-    putWord32le i
+    putWord64le i
 
 serializeValue (TFunc l) lbls _ = do
     putWord8    _FUN
@@ -94,11 +94,11 @@ serializeValue (TFunc l) lbls _ = do
 
 serializeValue (TPrim p) _ _ = do
     putWord8    _PRIM
-    putWord32le p
+    putWord64le p
 
 serializeValue (TSym s) _ syms = do
     putWord8    _SYM
-    putWord32le $ symbolIndex s syms
+    putWord64le $ symbolIndex s syms
 
 serializeValue (TUnit) _ _ = do
     putWord8    _UNIT
@@ -109,7 +109,7 @@ serializeInstr :: Instr -> Labels -> Symbols -> Put
 
 serializeInstr (Call i) _ _ = do
     putWord8    _CALL
-    putWord32le i
+    putWord8    i
 
 serializeInstr (Branch l) lbls _ = do
     putWord8    _BRANCH
@@ -117,7 +117,7 @@ serializeInstr (Branch l) lbls _ = do
 
 serializeInstr (Fetch i) _ _ = do
     putWord8    _FETCH
-    putWord32le i
+    putWord64le i
 
 serializeInstr (Jump i) lbl _ = do
     putWord8    _JUMP
@@ -134,11 +134,11 @@ serializeInstr (Push i) lbls syms = do
 
 serializeInstr (Alloc i) _ _ = do
     putWord8    _ALLOC
-    putWord32le i
+    putWord64le i
 
 serializeInstr (Store i) _ _ = do
     putWord8    _STORE
-    putWord32le i
+    putWord64le i
 
 serializeInstr (Return) _ _ = do
     putWord8    _RETURN

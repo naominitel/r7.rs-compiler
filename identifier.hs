@@ -21,8 +21,8 @@ instance Expression Identifier where
     codegen (Identifier var p) st@(env, lbl) = 
         case (primFetch var, envFetch var env) of 
             (Just primId, _) -> 
-                return ([Push (TPrim (fromIntegral primId :: Word32))], st)
+                return ([Push (TPrim (fromIntegral primId :: Word64))], st)
             (_, Just envId) -> 
-                return ([Fetch (fromIntegral envId :: Word32)], st)
+                return ([Fetch (fromIntegral envId :: Word64)], st)
             (Nothing, Nothing) -> 
                 fail $ "Unbound variable " ++ var ++ " at " ++ show p

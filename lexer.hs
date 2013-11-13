@@ -48,7 +48,7 @@ data Token
     | TokIf Pos
     | TokLambda Pos
     | TokLet Pos
-    | TokInt Word32 Pos
+    | TokInt Word64 Pos
     | TokBool Bool Pos
     | TokQuote Pos
     | TokStr String Pos
@@ -135,7 +135,7 @@ tokenize ("if", p)     = Right $ TokIf p
 tokenize ("#t", p)     = Right $ TokBool True p
 tokenize ("#f", p)     = Right $ TokBool False p
 tokenize (s, p)
-    | s =~ integer     = Right $ TokInt (read s :: Word32) p
+    | s =~ integer     = Right $ TokInt (read s :: Word64) p
     | s =~ string      = Right $ TokStr (read s :: String) p
     | s =~ identifier  = Right $ TokId s p
     | otherwise        = Left $ "Unknown token " ++ s ++ " at " ++ show p

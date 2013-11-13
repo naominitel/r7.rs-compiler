@@ -13,7 +13,7 @@ import Lexer
 -- This module handles literal constants
 
 data Constant 
-    = IntConstant Word32 Pos
+    = IntConstant Word64 Pos
     | BoolConstant Bool Pos
     | Symbol String Pos
 

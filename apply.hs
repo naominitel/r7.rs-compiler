@@ -42,4 +42,4 @@ instance Expression Apply where
         in args >>= \(a,st1) -> 
             let func = codegen f st1
             in func >>= \(f, st2) -> return 
-                (a ++ f ++ [Call (fromIntegral (length parms) :: Word32)], st2)
+                (a ++ f ++ [Call (fromIntegral (length parms) :: Word8)], st2)

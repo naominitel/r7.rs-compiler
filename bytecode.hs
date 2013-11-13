@@ -29,25 +29,25 @@ import Data.Word
 
 data Type 
     = TBool Bool
-    | TInt Word32
+    | TInt Word64
     | TFunc Word32
-    | TPrim Word32
+    | TPrim Word64
     | TSym String
     | TUnit
 
 -- Instr: the instructions of the assembly language, with their operands
 
 data Instr 
-    = Alloc Word32
-    | Call Word32
-    | Fetch Word32
+    = Alloc Word64
+    | Call Word8
+    | Fetch Word64
     | Jump Word32
     | Label Word32
     | Pop
     | Push Type
     | Branch Word32
     | Return
-    | Store Word32
+    | Store Word64
 
 -- bytecode repsentation of types and instructions (opcodes)
 
