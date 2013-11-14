@@ -3,7 +3,6 @@ module Compiler
     Env,
     CompilerState,
     initialState,
-    primFetch,
     envFetch,
     nextLabel,
     envExtend,
@@ -21,7 +20,7 @@ type CompilerState = ([Env], Word32)
 -- Initial compiler state at the beginning of the compilation
 
 initialState :: CompilerState
-initialState = ([], 0)
+initialState = ([primEnv], 0)
 
 -- Global environment for containing primitives
 
@@ -34,11 +33,6 @@ primEnv = ["+", "-", "*", "/", "=", "list", "cons", "car", "cdr",
 envSearch :: String -> Env -> Int -> Maybe Int
 envSearch _ [] _ = Nothing
 envSearch s (v:e) i = if s == v then Just i else envSearch s e (i + 1)
-
--- return the position of the given primitive in the primitives environment
-
-primFetch :: String -> Maybe Int
-primFetch s = envSearch s primEnv 0
 
 -- return the position of an identifier in the lexical environment
 
