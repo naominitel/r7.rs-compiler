@@ -26,6 +26,13 @@ ghc -XExistentialQuantification --make main.hs
 ```
 
 You just need a recent version of GHC to build. 
+You will also need the ```Text.Regex.Posix``` module that can be found on
+Hackage:
+
+```shell
+cabal install regex-posix
+```
+
 The compiler can then be run with:
 
 ```
