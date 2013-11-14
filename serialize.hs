@@ -30,12 +30,18 @@ import Bytecode
 -- computes the length (bytes) of the serialized version of a single instruction
 
 serializedLength :: Instr -> Word32
-serializedLength (Label _)      = 0
-serializedLength (Return)       = 1
-serializedLength (Pop)          = 1
-serializedLength (Push (TUnit)) = 2
-serializedLength (Push _)       = 6
-serializedLength _              = 5
+serializedLength (Label _)        = 0
+serializedLength (Return)         = 1
+serializedLength (Pop)            = 1
+serializedLength (Call _)         = 2
+serializedLength (Push (TUnit))   = 2
+serializedLength (Push (TBool _)) = 3
+serializedLength (Push (TFunc _)) = 6
+serializedLength (Push _)         = 10
+serializedLength (Alloc _)        = 9
+serializedLength (Fetch _)        = 9
+serializedLength (Store _)        = 9
+serializedLength _                = 5
 
 -- associates a label number to its adress inside the program
 
