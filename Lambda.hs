@@ -22,10 +22,11 @@ instance Show Lambda where
 instance Expression Lambda where
     codegen (Lambda args (AST expr) p) st =
         let (flbl, st1) = nextLabel st
-            (clbl, st2) = nextLabel st1
+            (clbl, st2@(e, _)) = nextLabel st1
             st3 = envExtend args st2
             rec = (codegen expr st3)
             instrs1 = [Jump clbl, Label flbl]
             instrs2 = [Return, Label clbl, Push (TFunc flbl)]
-        in rec >>= \(instrs, st4) -> return (instrs1 ++ instrs ++ instrs2, st4)
+        in rec >>= \(instrs, (_, pc)) ->
+            return (instrs1 ++ instrs ++ instrs2, (e, pc))
 
