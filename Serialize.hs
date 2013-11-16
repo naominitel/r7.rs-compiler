@@ -92,19 +92,19 @@ serializeValue (TBool b) _ _ = do
 
 serializeValue (TInt i) _ _ = do
     putWord8    _INT
-    putWord64le i
+    putWord64be i
 
 serializeValue (TFunc l) lbls _ = do
     putWord8    _FUN
-    putWord32le $ labelIndex l lbls
+    putWord32be $ labelIndex l lbls
 
 serializeValue (TPrim p) _ _ = do
     putWord8    _PRIM
-    putWord64le p
+    putWord64be p
 
 serializeValue (TSym s) _ syms = do
     putWord8    _SYM
-    putWord64le $ symbolIndex s syms
+    putWord64be $ symbolIndex s syms
 
 serializeValue (TUnit) _ _ = do
     putWord8    _UNIT
@@ -119,15 +119,15 @@ serializeInstr (Call i) _ _ = do
 
 serializeInstr (Branch l) lbls _ = do
     putWord8    _BRANCH
-    putWord32le $ labelIndex l lbls 
+    putWord32be $ labelIndex l lbls
 
 serializeInstr (Fetch i) _ _ = do
     putWord8    _FETCH
-    putWord64le i
+    putWord64be i
 
 serializeInstr (Jump i) lbl _ = do
     putWord8    _JUMP
-    putWord32le $ labelIndex i lbl
+    putWord32be $ labelIndex i lbl
 
 serializeInstr (Label _) _ _ = return ()
  
@@ -140,11 +140,11 @@ serializeInstr (Push i) lbls syms = do
 
 serializeInstr (Alloc i) _ _ = do
     putWord8    _ALLOC
-    putWord64le i
+    putWord64be i
 
 serializeInstr (Store i) _ _ = do
     putWord8    _STORE
-    putWord64le i
+    putWord64be i
 
 serializeInstr (Return) _ _ = do
     putWord8    _RETURN
@@ -210,7 +210,7 @@ createSymbolTable set =
             [] -> return ()
             (s:r) -> do
                 let astr = BS.pack $ toAscii s
-                putWord32le (fromIntegral (BS.length astr) :: Word32)
+                putWord32be (fromIntegral (BS.length astr) :: Word32)
                 putByteString astr
                 aux r
     in aux (elems set)
