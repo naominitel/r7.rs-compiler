@@ -19,5 +19,5 @@ instance Expression Define where
     codegen (Define i (AST expr) _) st = 
         let rec = codegen expr st
         in rec >>= \(e,st1) -> 
-            return ([Alloc 1] ++ e ++ [Store 0] ++ [Push TUnit], 
+            return (e ++ [Alloc 1] ++ [Store 0] ++ [Push TUnit],
                 envExtend [i] st1)
