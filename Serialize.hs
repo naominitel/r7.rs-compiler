@@ -210,10 +210,13 @@ createSymbolTable set =
             [] -> return ()
             (s:r) -> do
                 let astr = BS.pack $ toAscii s
-                putWord32be (fromIntegral (BS.length astr) :: Word32)
+                putWord64be (fromIntegral (BS.length astr) :: Word64)
                 putByteString astr
                 aux r
-    in aux (elems set)
+    in do
+        let its = (elems set)
+        putWord64be (fromIntegral (Prelude.length its) :: Word64)
+        aux its
 
 -- write an assembly program to file:
 --      * Find all the symbols
