@@ -14,6 +14,7 @@ module Lexer
         TokInt, 
         TokBool,
         TokQuote,
+        TokSet,
         TokStr,
         TokId
     ),
@@ -51,6 +52,7 @@ data Token
     | TokInt Word64 Pos
     | TokBool Bool Pos
     | TokQuote Pos
+    | TokSet Pos
     | TokStr String Pos
     | TokId String Pos
 
@@ -126,6 +128,7 @@ tokenize :: (String, Pos) -> Either String Token
 tokenize ("(", p)      = Right $ TokOpen p
 tokenize (")", p)      = Right $ TokClose p
 tokenize ("let", p)    = Right $ TokLet p
+tokenize ("set!", p)   = Right $ TokSet p
 tokenize ("lambda", p) = Right $ TokLambda p
 tokenize ("define", p) = Right $ TokDefine p
 tokenize ("begin", p)  = Right $ TokBegin p

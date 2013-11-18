@@ -24,6 +24,7 @@ import If
 import Lambda
 import Lexer
 import Quote
+import Set
 import Syntax
 import Tree
 
@@ -105,6 +106,14 @@ expand (TokNode (lbd@(TokLeaf (TokLambda p)) : args@(TokNode lst) : exprs)) =
 
 expand (TokNode (TokLeaf (TokLambda p) : _)) = 
     fail $ "Malformed lambda-expr at " ++ show p
+
+-- Parsing for (set! id val)
+
+expand (TokNode (TokLeaf (TokSet _) : (TokLeaf (TokId i p)) : expr : [])) =
+    expand expr >>= \e -> return $ AST $ Set i e p
+
+expand (TokNode (TokLeaf (TokSet p) : _)) =
+    fail $ "Syntax error: malformed set!-expression at: " ++ show p
 
 -- Parsing for (define id val)
 
