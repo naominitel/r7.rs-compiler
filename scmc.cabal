@@ -1,0 +1,17 @@
+Name:           scmc
+Version:        0.1
+Author:         Naomi Nitel
+Maintainer:     naominitel@gmail.com
+Build-type:     Simple
+Cabal-version:  >= 1.2
+
+Executable scmc
+  Main-is: Main.hs
+  Extensions: ExistentialQuantification
+
+  Build-depends: 
+    base,
+    binary,
+    bytestring,
+    containers,
+    regex-posix
