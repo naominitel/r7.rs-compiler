@@ -1,3 +1,8 @@
+r7.rs-compiler
+==============
+
+[![Build Status](https://travis-ci.org/naominitel/r7.rs-compiler.png?branch=master)](https://travis-ci.org/naominitel/r7.rs-compiler)
+
 This is a project of a full [R7RS](http://www.scheme-reports.org/2013/working-group-1.html) Scheme implementation.
 It aims at being as interoperable as possible with other Scheme implementations, which means: 
 
