@@ -16,8 +16,8 @@ instance Show Define where
     show (Define var expr _) = "(define " ++ var ++ " " ++ show expr ++ ")"
  
 instance Expression Define where
-    codegen (Define i (AST expr) _) st = 
-        let rec = codegen expr st
+    codegen (Define i (AST expr) _) st _ =
+        let rec = codegen expr st False
         in rec >>= \(e,st1) -> 
             return (e ++ [Alloc 1] ++ [Store 0] ++ [Push TUnit],
                 envExtend [i] st1)

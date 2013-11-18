@@ -34,6 +34,7 @@ serializedLength (Label _)        = 0
 serializedLength (Return)         = 1
 serializedLength (Pop)            = 1
 serializedLength (Call _)         = 2
+serializedLength (TCall _)        = 2
 serializedLength (Push (TUnit))   = 2
 serializedLength (Push (TBool _)) = 3
 serializedLength (Push (TFunc _)) = 6
@@ -115,6 +116,10 @@ serializeInstr :: Instr -> Labels -> Symbols -> Put
 
 serializeInstr (Call i) _ _ = do
     putWord8    _CALL
+    putWord8    i
+
+serializeInstr (TCall i) _ _ = do
+    putWord8    _TCALL
     putWord8    i
 
 serializeInstr (Branch l) lbls _ = do

@@ -1,6 +1,6 @@
 module Bytecode
 (
-    Instr(Call, Fetch, Jump, Label, Pop, Push, Return, Branch, Alloc, Store),
+    Instr(Call, TCall, Fetch, Jump, Label, Pop, Push, Return, Branch, Alloc, Store),
     Type(TBool, TInt, TFunc, TPrim, TSym, TUnit),
     _BOOL,  
     _INT,   
@@ -16,7 +16,8 @@ module Bytecode
     _RETURN,
     _BRANCH,
     _ALLOC,
-    _STORE
+    _STORE,
+    _TCALL
 ) where
 
 import Data.ByteString
@@ -40,6 +41,7 @@ data Type
 data Instr 
     = Alloc Word64
     | Call Word8
+    | TCall Word8
     | Fetch Word64
     | Jump Word32
     | Label Word32
@@ -66,6 +68,7 @@ _FETCH  = 0x08 :: Word8
 _BRANCH = 0x09 :: Word8
 _STORE  = 0x0A :: Word8
 _ALLOC  = 0x0C :: Word8
+_TCALL  = 0x0D :: Word8
 
 -- dump asm instructions
 
@@ -80,6 +83,7 @@ instance Show Type where
 instance Show Instr where
     show (Branch i) = "BRANCH " ++ show i
     show (Call i)   = "CALL "   ++ show i 
+    show (TCall i)  = "TCALL "  ++ show i
     show (Fetch i)  = "FETCH "  ++ show i
     show (Jump i)   = "JUMP "   ++ show i
     show (Label i)  = "LABEL "  ++ show i

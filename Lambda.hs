@@ -20,11 +20,11 @@ instance Show Lambda where
 -- Assembly code generation for Lambda expressions
 
 instance Expression Lambda where
-    codegen (Lambda args (AST expr) p) st =
+    codegen (Lambda args (AST expr) p) st _ =
         let (flbl, st1) = nextLabel st
             (clbl, st2@(e, _)) = nextLabel st1
             st3 = envExtend args st2
-            rec = (codegen expr st3)
+            rec = (codegen expr st3 True)
             instrs1 = [Jump clbl, Label flbl]
             instrs2 = [Return, Label clbl, Push (TFunc flbl)]
         in rec >>= \(instrs, (_, pc)) ->

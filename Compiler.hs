@@ -53,8 +53,14 @@ envExtend :: Env -> CompilerState -> CompilerState
 envExtend e1 (e2, lbl) = (e1:e2, lbl)
 
 -- basic class for expressions that can be compiled
+-- The CompilerState type is passed to any codegen function and
+-- includes information about the current context of the expression
+-- being compiled:
+--   * The lexical environment
+--   * The next available label
+--   * If the current expression is in last-call-position
 
 class (Show a) => Expression a where
-    codegen :: a -> CompilerState -> Either String ([Instr], CompilerState)
+    codegen :: a -> CompilerState -> Bool -> Either String ([Instr], CompilerState)
 
     

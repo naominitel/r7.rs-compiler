@@ -104,7 +104,7 @@ main = do
                         -- generate assembly
                         Right asts -> 
                             let ast = (Begin asts (Pos 0 0)) in
-                            case codegen ast initialState of
+                            case codegen ast initialState False of
 
                             -- compile-time error
                             Left err -> print err

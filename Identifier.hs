@@ -18,7 +18,7 @@ instance Show Identifier where
 -- Assembly code generation for accessing to a variable
  
 instance Expression Identifier where
-    codegen (Identifier var p) st@(env, lbl) = 
+    codegen (Identifier var p) st@(env, lbl) _ =
         case envFetch var env of 
             (Just envId) -> 
                 return ([Fetch (fromIntegral envId :: Word64)], st)

@@ -23,6 +23,6 @@ instance Show Constant where
     show (Symbol s _) = show s
  
 instance Expression Constant where
-    codegen (IntConstant i _) st = return ([Push $ TInt i], st)
-    codegen (BoolConstant b _) st = return ([Push $ TBool b], st)
-    codegen (Symbol s _) st = return ([Push $ TSym s], st)
+    codegen (IntConstant i _) st _ = return ([Push $ TInt i], st)
+    codegen (BoolConstant b _) st _ = return ([Push $ TBool b], st)
+    codegen (Symbol s _) st _ = return ([Push $ TSym s], st)
