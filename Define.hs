@@ -1,12 +1,17 @@
 module Define
 (
-    Define(Define)
+    Define(Define),
+    Scope(Scope),
+    scopeAddDef,
+    scopeAddExpr
 ) where
 
 import AST
+import Begin
 import Bytecode
 import Compiler
 import Lexer
+import Data.Word
 
 -- an identifier definition (define id val)  
 
@@ -15,9 +20,34 @@ data Define = Define String AST Pos
 instance Show Define where
     show (Define var expr _) = "(define " ++ var ++ " " ++ show expr ++ ")"
  
-instance Expression Define where
-    codegen (Define i (AST expr) _) st _ =
-        let rec = codegen expr st False
-        in rec >>= \(e,st1) -> 
-            return (e ++ [Alloc 1] ++ [Store 0] ++ [Push TUnit],
-                envExtend [i] st1)
+data Scope = Scope [Define] Begin
+
+scopeAddDef :: Scope -> Define -> Scope
+scopeAddDef (Scope l e) d = (Scope (d:l) e)
+
+scopeAddExpr :: Scope -> AST -> Scope
+scopeAddExpr (Scope l (Begin e p)) expr = Scope l $ Begin (expr:e) p
+
+instance Show Scope where
+    show (Scope defs expr) = "a scope with defines " ++ show defs ++ "/" ++ show expr
+
+compileDefines :: [Define] -> Word64 -> CompilerState -> Either String ([Instr], CompilerState)
+compileDefines [] _ st = return ([], st)
+compileDefines ((Define var (AST e) _) : r) i st =
+    case codegen e st False of
+        Left err -> Left err
+        Right (ins, st) ->
+            compileDefines r (i + 1) st >>= \(n, s) ->
+            return (ins ++ [(Store i)] ++ n, s)
+
+instance Expression Scope where
+    codegen (Scope defs body) st pos =
+        let envsize = fromIntegral (length defs) :: Word64
+            env = map (\(Define var _ _) -> var) defs
+            st1 = envExtend env st
+            rec = compileDefines defs 0 st1
+        in case rec of
+            Left err -> Left err
+            Right (d, st2) ->
+                codegen body st2 pos >>= \(b, s) ->
+                    return ([Alloc envsize] ++ d ++ b, s)

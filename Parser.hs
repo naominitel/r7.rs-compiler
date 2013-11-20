@@ -92,18 +92,11 @@ expand (TokNode (TokLeaf (TokLet p) : _)) =
 
 -- Parsing for (lambda (e1 ... en) expr)
 
-expand (TokNode (TokLeaf (TokLambda p) : (TokNode lst) : expr : [])) =
+expand (TokNode (TokLeaf (TokLambda p) : (TokNode lst) : exprs)) =
     let args = lambdaArgs lst
-        lbda = (args >>= \(a, v) -> return $ Lambda a v)
-            <*> expand expr <*> return p
+        body = (parseBody exprs) >>= return . AST
+        lbda = (args >>= \(a, v) -> return $ Lambda a v) <*> body <*> return p
     in lbda >>= return . AST
-
--- Parsing for (lambda (e1 ... en) expr1 ... exprn) (implicit begin)
-
-expand (TokNode (lbd@(TokLeaf (TokLambda p)) : args@(TokNode lst) : exprs)) = 
-    let begin  = TokNode $ (TokLeaf $ (TokBegin p)) : exprs
-        lambda = TokNode $ [lbd, args, begin]
-    in expand lambda
 
 expand (TokNode (TokLeaf (TokLambda p) : _)) = 
     fail $ "Malformed lambda-expr at " ++ show p
@@ -115,21 +108,6 @@ expand (TokNode (TokLeaf (TokSet _) : (TokLeaf (TokId i p)) : expr : [])) =
 
 expand (TokNode (TokLeaf (TokSet p) : _)) =
     fail $ "Syntax error: malformed set!-expression at: " ++ show p
-
--- Parsing for (define id val)
-
-expand (TokNode (TokLeaf (TokDefine _) : (TokLeaf (TokId i p)) : expr : [])) =
-    expand expr >>= \e -> return $ AST $ Define i e p
-
--- Parsing for (define (id args) val) -> (define id (lambda (args)) val)
-
-expand (TokNode (TokLeaf (TokDefine _) : (TokNode (TokLeaf (TokId i p) : args)) : expr : [])) =
-    let lambda = (TokNode (TokLeaf (TokLambda p) : (TokNode args) : expr : []))
-        parsedLambda = expand lambda
-    in parsedLambda >>= \l -> return $ AST $ Define i l p
-
-expand (TokNode (TokLeaf (TokDefine p) : _)) = 
-    fail $ "Malformed define expression at " ++ show p
 
 -- Parsing for (if expr-bool expr-if expr-else)
 
@@ -165,17 +143,62 @@ expand (TokNode (func : args)) =
         expr =  (parsedFunc >>= return . Apply) <*> parsedArgs <*> return (Pos 0 0) -- FIXME
     in expr >>= return . AST
 
+expand (TokLeaf (TokDefine _)) = fail $ "Define not allowed in this context"
+
 -- Parsing for anything else, like "var" or "1"
 
 expand (TokLeaf (TokBool b p))  = return $ AST $ BoolConstant b p
 expand (TokLeaf (TokInt i p))   = return $ AST $ IntConstant i p
 expand (TokLeaf (TokId s p)) = return $ AST $ Identifier s p
 
+mcons :: Either String a -> Either String b -> Either String (a, b)
+mcons (Left err) _ = Left err
+mcons _ (Left err) = Left err
+mcons (Right a) (Right b) = Right (a, b)
+
+-- parse a (define)
+
+parseDefine :: [TokenTree] -> Either String Define
+
+-- parsing for (define id expr)
+
+parseDefine (TokLeaf (TokId i p) : expr : []) =
+    expand expr >>= \e -> return $ Define i e p
+
+-- Parsing for (define (id args) expr...) -> (define id (lambda (args)) expr)
+
+parseDefine (TokNode (TokLeaf (TokId i p) : args) : expr) =
+    let lambda = (TokNode (TokLeaf (TokLambda p) : (TokNode args) : expr))
+        parsedLambda = expand lambda
+    in parsedLambda >>= \l -> return $ Define i l p
+
+parseDefine _ = fail $ "Malformed define expression"
+
+-- parse a list of token where a (define ...)* (expr ...)+ is expected
+
+parseBody :: [TokenTree] -> Either String Scope
+parseBody [] = fail $ "Empty body"
+parseBody (TokNode (TokLeaf (TokDefine _) : _) : []) = fail $ "Empty body"
+parseBody (TokNode (TokLeaf (TokDefine _) : d@_) : r) =
+    let def = parseDefine d
+        scp = parseBody r
+        c = mcons def scp
+    in c >>= \(d, s) -> Right $ scopeAddDef s d
+parseBody (_ : TokNode (TokLeaf (TokDefine _) : _) : _) = fail $
+    "(define) not allowed in an expression context"
+parseBody (expr : []) =
+    (expand expr) >>= \e -> Right $ Scope [] $ Begin [e] (Pos 0 0)
+parseBody (expr : r) =
+    let exp = expand expr
+        scp = parseBody r
+        c = mcons exp scp
+    in c >>= \(e, r) -> Right $ scopeAddExpr r e
+
 -- parser: entry point for the parser
 
-parser :: [Token] -> Either String [AST]
+parser :: [Token] -> Either String AST
 
 parser tokens = 
     case arborize tokens of
-        (exprs, []) -> mapM expand exprs -- Fixme: should be map expand exprs
+        (exprs, []) -> parseBody exprs >>= return . AST
         (_, _) -> fail "Parse error: extra tokens after parenthesis"

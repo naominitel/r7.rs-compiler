@@ -12,8 +12,6 @@ module Syntax
 import Lexer
 import Tree
 
-import Debug.Trace
-
 -- args of a let epression
 -- couple (Identifier, expression)
 

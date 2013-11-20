@@ -102,8 +102,7 @@ main = do
                         Left err -> putStrLn err
 
                         -- generate assembly
-                        Right asts -> 
-                            let ast = (Begin asts (Pos 0 0)) in
+                        Right (AST ast) ->
                             case codegen ast initialState False of
 
                             -- compile-time error
