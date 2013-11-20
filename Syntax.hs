@@ -43,8 +43,13 @@ letArgsValues ((i, tree) : r) = letArgsValues r >>= return . (:) tree
 
 -- return the list of arguments of a lambda-expr
 -- e.g. [a, b, c]
+-- The Maybe String represents the presence of a variadic parameter
+-- e.g. for (lambda (a b . c) ...) this returns ([a, b], (Just c))
 
-lambdaArgs :: [TokenTree] -> Either String [String]
-lambdaArgs [] = return []
-lambdaArgs (TokLeaf (TokId arg _) : r) = (lambdaArgs r) >>= return . (:) arg
+lambdaArgs :: [TokenTree] -> Either String ([String], Maybe String)
+lambdaArgs [] = return ([], Nothing)
+lambdaArgs (TokLeaf (TokId arg _) : r) = (lambdaArgs r) >>= \(a, v) ->
+            return $ (arg : a, v)
+lambdaArgs (TokLeaf (TokDot _) : (TokLeaf (TokId var _)) : []) =
+            return ([], (Just var))
 lambdaArgs a = fail "Malformed lambda parameter list"

@@ -31,7 +31,7 @@ import Data.Word
 data Type 
     = TBool Bool
     | TInt Word64
-    | TFunc Word32
+    | TFunc Word32 Word8 Bool
     | TPrim Word64
     | TSym String
     | TUnit
@@ -73,12 +73,12 @@ _TCALL  = 0x0D :: Word8
 -- dump asm instructions
 
 instance Show Type where
-    show (TBool b)  = "BOOL "   ++ show b
-    show (TInt i)   = "INT "    ++ show i
-    show (TFunc i)  = "FUNC "   ++ show i
-    show (TPrim i)  = "PRIM "   ++ show i
-    show (TSym i)   = "SYMBOL " ++ i
-    show (TUnit)    = "UNIT"
+    show (TBool b)     = "BOOL "   ++ show b
+    show (TInt i)      = "INT "    ++ show i
+    show (TFunc i a v) = "FUNC "   ++ show (i, a, v)
+    show (TPrim i)     = "PRIM "   ++ show i
+    show (TSym i)      = "SYMBOL " ++ i
+    show (TUnit)       = "UNIT"
 
 instance Show Instr where
     show (Branch i) = "BRANCH " ++ show i

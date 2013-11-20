@@ -94,7 +94,8 @@ expand (TokNode (TokLeaf (TokLet p) : _)) =
 
 expand (TokNode (TokLeaf (TokLambda p) : (TokNode lst) : expr : [])) =
     let args = lambdaArgs lst
-        lbda = (args >>= return . Lambda) <*> expand expr <*> return p
+        lbda = (args >>= \(a, v) -> return $ Lambda a v)
+            <*> expand expr <*> return p
     in lbda >>= return . AST
 
 -- Parsing for (lambda (e1 ... en) expr1 ... exprn) (implicit begin)

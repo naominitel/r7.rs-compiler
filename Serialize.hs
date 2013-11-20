@@ -30,19 +30,19 @@ import Bytecode
 -- computes the length (bytes) of the serialized version of a single instruction
 
 serializedLength :: Instr -> Word32
-serializedLength (Label _)        = 0
-serializedLength (Return)         = 1
-serializedLength (Pop)            = 1
-serializedLength (Call _)         = 2
-serializedLength (TCall _)        = 2
-serializedLength (Push (TUnit))   = 2
-serializedLength (Push (TBool _)) = 3
-serializedLength (Push (TFunc _)) = 6
-serializedLength (Push _)         = 10
-serializedLength (Alloc _)        = 9
-serializedLength (Fetch _)        = 9
-serializedLength (Store _)        = 9
-serializedLength _                = 5
+serializedLength (Label _)            = 0
+serializedLength (Return)             = 1
+serializedLength (Pop)                = 1
+serializedLength (Call _)             = 2
+serializedLength (TCall _)            = 2
+serializedLength (Push (TUnit))       = 2
+serializedLength (Push (TBool _))     = 3
+serializedLength (Push (TFunc _ _ _)) = 8
+serializedLength (Push _)             = 10
+serializedLength (Alloc _)            = 9
+serializedLength (Fetch _)            = 9
+serializedLength (Store _)            = 9
+serializedLength _                    = 5
 
 -- associates a label number to its adress inside the program
 
@@ -95,9 +95,11 @@ serializeValue (TInt i) _ _ = do
     putWord8    _INT
     putWord64be i
 
-serializeValue (TFunc l) lbls _ = do
+serializeValue (TFunc l a v) lbls _ = do
     putWord8    _FUN
     putWord32be $ labelIndex l lbls
+    putWord8    a
+    putWord8    (if v then 1 else 0)
 
 serializeValue (TPrim p) _ _ = do
     putWord8    _PRIM

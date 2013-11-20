@@ -16,7 +16,8 @@ module Lexer
         TokQuote,
         TokSet,
         TokStr,
-        TokId
+        TokId,
+        TokDot
     ),
 
     lexer, 
@@ -55,6 +56,7 @@ data Token
     | TokSet Pos
     | TokStr String Pos
     | TokId String Pos
+    | TokDot Pos
 
 instance Show Token where
     show (TokOpen pos)    = "Open"
@@ -67,6 +69,7 @@ instance Show Token where
     show (TokBool b pos)  = show b
     show (TokStr s pos)   = show s
     show (TokId t pos)    = t
+    show (TokDot _)       = "."
 
 tokPos :: Token -> Pos
 tokPos (TokOpen pos)    = pos
@@ -79,6 +82,7 @@ tokPos (TokInt _ pos)   = pos
 tokPos (TokBool _ pos)  = pos
 tokPos (TokStr _ pos)   = pos
 tokPos (TokId _ pos)    = pos
+tokPos (TokDot pos)     = pos
 
 -- Program
 
@@ -125,6 +129,7 @@ string = "\"(\\.|[^\\\\\"])*\""
 -- Tokenize: core of the lexer, transforms the program into a token list
 
 tokenize :: (String, Pos) -> Either String Token
+tokenize (".", p)      = Right $ TokDot p
 tokenize ("(", p)      = Right $ TokOpen p
 tokenize (")", p)      = Right $ TokClose p
 tokenize ("let", p)    = Right $ TokLet p
