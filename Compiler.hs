@@ -1,26 +1,29 @@
 module Compiler
 (
     Env,
-    CompilerState,
-    initialState,
-    envFetch,
-    nextLabel,
+    Expression(codegen),
+    Result(Failure, Pass),
+    State,
+    continue,
     envExtend,
-    Expression(codegen)
+    envFetch,
+    initialState,
+    nextLabel
 ) where
+
+import Data.Word
 
 import Error
 import Bytecode
-import Data.Word
 
 -- This module contains various definition for code generation
 
 type Env = [String]
-type CompilerState = ([Env], Word32)
+type State = ([Env], Word32)
 
 -- Initial compiler state at the beginning of the compilation
 
-initialState :: CompilerState
+initialState :: State
 initialState = ([primEnv], 0)
 
 -- Global environment for containing primitives
@@ -45,12 +48,12 @@ envFetch s (e:r) = case envSearch s e 0 of
 
 -- return a new usable label depending on the current label
 
-nextLabel :: CompilerState -> (Word32, CompilerState)
+nextLabel :: State -> (Word32, State)
 nextLabel (env, lbl) = (lbl, (env, lbl + 1))
 
 -- returns a new compiler state by adding an environment to the lexical env.
 
-envExtend :: Env -> CompilerState -> CompilerState
+envExtend :: Env -> State -> State
 envExtend e1 (e2, lbl) = (e1:e2, lbl)
 
 -- basic class for expressions that can be compiled
@@ -61,7 +64,22 @@ envExtend e1 (e2, lbl) = (e1:e2, lbl)
 --   * The next available label
 --   * If the current expression is in last-call-position
 
-class (Show a) => Expression a where
-    codegen :: a -> CompilerState -> Bool -> Either Error ([Instr], CompilerState)
+data Result = Failure [Error] State | Pass [Instr] State
 
-    
+continue :: Result -> (State -> Result) -> ([Instr] -> [Instr] -> [Instr]) -> Result
+continue ret next gen =
+    case ret of
+        Failure errs st ->
+            let cont = next st in
+            case cont of
+                Failure e s -> Failure (errs ++ e) s
+                Pass _ s -> Failure errs s
+        Pass instrs st ->
+            let cont = next st in
+            case cont of
+                Failure errs s -> cont
+                Pass i s -> Pass (gen instrs i) s
+
+class (Show a) => Expression a where
+    codegen :: a -> State -> Bool -> Result
+

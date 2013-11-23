@@ -22,6 +22,6 @@ instance Expression Identifier where
     codegen (Identifier var p) st@(env, lbl) _ =
         case envFetch var env of 
             (Just envId) -> 
-                return ([Fetch (fromIntegral envId :: Word64)], st)
+                Pass [Fetch (fromIntegral envId :: Word64)] st
             (Nothing) -> 
-                Left $ Error ("Unbound variable " ++ var) p
+                Failure [Error ("Unbound variable " ++ var) p] st

@@ -21,13 +21,11 @@ instance Show Apply where
  
  -- compile the expressions passed as arguments
 
-compileArgs :: [AST] -> CompilerState -> Either Error ([Instr], CompilerState)
-compileArgs [] st = return ([], st)
+compileArgs :: [AST] -> State -> Result
+compileArgs [] st = Pass [] st
 compileArgs ((AST a) : rest) st =
-    let exp1 = codegen a st False
-    in exp1 >>= \(exp,st1) -> 
-        let rec = compileArgs rest st1
-        in rec >>= \(r,st2) -> return (exp ++ r, st2)
+    let exp1 = codegen a st False in
+    continue exp1 (\st1 -> compileArgs rest st1) (++)
 
 -- Assembly generation for function application
 -- (f a b c) is compiled the following way :
@@ -39,11 +37,9 @@ compileArgs ((AST a) : rest) st =
 
 instance Expression Apply where
     codegen (Apply (AST f) parms) st pos =
-        let args = compileArgs (reverse parms) st
-        in args >>= \(a,st1) -> 
-            let func = codegen f st1 False
-            in func >>= \(f, st2) -> return 
-                (a ++ f ++ if pos
-                    then [TCall (fromIntegral (length parms) :: Word8)]
-                    else [Call (fromIntegral (length parms) :: Word8)],
-                st2)
+        let args = compileArgs (reverse parms) st in
+        continue args
+            (\st -> codegen f st False)
+            (\a f -> a ++ f ++ if pos
+                then [TCall (fromIntegral (length parms) :: Word8)]
+                else [Call (fromIntegral (length parms) :: Word8)])

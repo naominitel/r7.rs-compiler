@@ -63,7 +63,8 @@ expand (TokNode (TokLeaf (TokLet p) : (TokNode bindings) : expr : [])) =
     let args   = letArgs bindings
         ids    = args >>= letArgsIdentifiers
         vals   = args >>= letArgsValues
-        lambda = ids >>= \i -> return $ TokNode $ TokLeaf (TokLambda p) : (TokNode $ map TokLeaf i) : expr : []
+        lambda = ids >>= \i -> return $ TokNode $
+            TokLeaf (TokLambda p) : (TokNode $ map TokLeaf i) : expr : []
         apply  = (vals >>= \v -> return $ \l -> TokNode (l:v)) <*> lambda
     in apply >>= expand
 

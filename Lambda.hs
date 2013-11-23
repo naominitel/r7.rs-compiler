@@ -32,8 +32,11 @@ instance Expression Lambda where
             rec = (codegen expr st3 True)
             instrs1 = [Jump clbl, Label flbl]
             instrs2 = [Return, Label clbl,
-                Push (TFunc flbl (fromIntegral (length args) ::Word8)
+                Push (TFunc flbl (fromIntegral (length args) :: Word8)
                     (v /= Nothing))]
-        in rec >>= \(instrs, (_, pc)) ->
-            return (instrs1 ++ instrs ++ instrs2, (e, pc))
+        in continue rec
+            -- When returning the new compiler state, be careful to just
+            -- return the new label counter, and the old environment
+            (\(_, pc) -> Pass [] (e, pc))
+            (\instrs _ -> instrs1 ++ instrs ++ instrs2)
 

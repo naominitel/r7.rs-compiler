@@ -15,7 +15,7 @@ import Tree
 
 data Quote = Quote Datum Pos
 
-compileDatum :: Datum -> CompilerState -> Either Error ([Instr], CompilerState)
+compileDatum :: Datum -> State -> Result
 compileDatum (SimpleDatum constant) st = codegen constant st False
 
 instance Show Quote where

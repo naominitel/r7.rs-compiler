@@ -16,8 +16,7 @@ instance Show Begin where
 instance Expression Begin where
     codegen (Begin ((AST a) : [])) st p = codegen a st p
     codegen (Begin ((AST a) : rest)) (e, l) pos =
-        case codegen a (e, l) False of
-            Left err -> Left err
-            Right (e, st1@(ev, l)) ->
-                codegen (Begin rest) (ev, l) pos >>= \(i, st2) ->
-                return (e ++ [(Pop)] ++ i, st2)
+        let ret = codegen a (e, l) False in
+        continue ret
+            (\st -> codegen (Begin rest) st pos)
+            (\iret ir -> iret ++ [(Pop)] ++ ir)

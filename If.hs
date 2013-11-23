@@ -20,11 +20,11 @@ instance Expression If where
         let (onfalse, st1) = nextLabel st
             (contlbl, st2) = nextLabel st1
             cond = codegen ec st2 False
-        in cond >>= \(econd, st3) ->
-            let e1 = codegen et st3 p
-            in e1 >>= \(etrue, st4) ->
-                let e2 = codegen ef st4 p
-                in e2 >>= \(efalse, st5) -> return (
-                    econd ++ [(Branch onfalse)] ++
-                    etrue ++ [(Jump contlbl)] ++ [(Label onfalse)] ++
-                    efalse ++ [(Label contlbl)], st5)
+        in continue cond
+            (\st ->
+                let e1 = codegen et st p
+                in continue e1
+                    (\st -> codegen ef st p)
+                    (\t f -> t ++ [(Jump contlbl)] ++ [(Label onfalse)]
+                          ++ f ++ [(Label contlbl)]))
+            (\cond e -> cond ++ [(Branch onfalse)] ++ e)

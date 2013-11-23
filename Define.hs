@@ -32,14 +32,13 @@ scopeAddExpr (Scope l (Begin e)) expr = Scope l $ Begin (expr:e)
 instance Show Scope where
     show (Scope defs expr) = "a scope with defines " ++ show defs ++ "/" ++ show expr
 
-compileDefines :: [Define] -> Word64 -> CompilerState -> Either Error ([Instr], CompilerState)
-compileDefines [] _ st = return ([], st)
+compileDefines :: [Define] -> Word64 -> State -> Result
+compileDefines [] _ st = Pass [] st
 compileDefines ((Define var (AST e) _) : r) i st =
-    case codegen e st False of
-        Left err -> Left err
-        Right (ins, st) ->
-            compileDefines r (i + 1) st >>= \(n, s) ->
-            return (ins ++ [(Store i)] ++ n, s)
+    let rec = codegen e st False in
+    continue rec
+            (compileDefines r $ i + 1)
+            (\irec ir -> irec ++ [(Store i)] ++ ir)
 
 instance Expression Scope where
     codegen (Scope defs body) st pos =
@@ -47,8 +46,6 @@ instance Expression Scope where
             env = map (\(Define var _ _) -> var) defs
             st1 = envExtend env st
             rec = compileDefines defs 0 st1
-        in case rec of
-            Left err -> Left err
-            Right (d, st2) ->
-                codegen body st2 pos >>= \(b, s) ->
-                    return ([Alloc envsize] ++ d ++ b, s)
+        in continue rec
+            (\st -> codegen body st pos)
+            (\idefs ibody -> [Alloc envsize] ++ idefs ++ ibody)

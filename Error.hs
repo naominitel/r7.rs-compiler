@@ -1,12 +1,14 @@
 module Error
 (
     Error(Error),
-    reportError
+    reportErrors,
+    reportError,
 ) where
 
-import Lexer
 import System.Console.ANSI
 import System.IO
+
+import Lexer
 
 -- Error <reason> <where>
 data Error = Error String Pos
@@ -14,22 +16,39 @@ data Error = Error String Pos
 hGetNLine :: String -> Int -> IO String
 hGetNLine fp n = do
     h <- openFile fp ReadMode
-    let iter n = if n == 1 then hGetLine h else let _ = hGetLine h in iter $ n - 1
+    let iter n = do
+        if n == 1
+            then do
+                line <- hGetLine h
+                hClose h
+                return line
+            else do
+                _ <- hGetLine h
+                iter $ n - 1
     iter n 
 
 reportError :: Error -> IO ()
 reportError (Error reason pos@(Pos l c f)) = do
-    let prfx = f ++ ":" ++ (show l) ++ " "
     putStr $ (show pos) ++ ": "
+
     setSGR [SetColor Foreground Dull Red]
     putStr "error: "
     setSGR [SetColor Foreground Dull White]
     putStrLn reason
     setSGR [Reset]
+
     line <- hGetNLine f l
-    putStrLn $ prfx ++ line
+    let prfx = f ++ ":" ++ (show l) ++ " "
     let spCount = (length prfx) + (c - 1)
+    putStrLn $ prfx ++ line
+
     setSGR [SetColor Foreground Dull Red]
     putStrLn $ (take spCount $ repeat ' ') ++ "^~"
     setSGR [Reset]
+
+reportErrors :: [Error] -> IO ()
+reportErrors [] = return ()
+reportErrors (err : r) = do
+    reportError err
+    reportErrors r
     fail "Aborting due to previous errors"

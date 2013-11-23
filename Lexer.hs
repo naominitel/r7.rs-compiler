@@ -95,14 +95,14 @@ forward :: Pos -> Pos
 forward (Pos l c f) = (Pos l (c + 1) f)
 
 newline :: Pos -> Pos
-newline (Pos l c f) = (Pos (l + 1) 0 f)
+newline (Pos l c f) = (Pos (l + 1) 1 f)
 
 -- cut: split the program into string tokens
 
 separator :: Char -> Bool
 separator c 
     | [c] =~ "[ \t\r\n()]" = True
-    | otherwise          = False
+    | otherwise            = False
 
 cut :: Program -> [(String, Pos)]
 
@@ -120,7 +120,8 @@ cut (a:c:s, pos)
 
 -- Regular expressions used to tokenize the program
 
-identifier = "^(([a-zA-Z!$%&*/:<=>?^_`-][a-zA-Z!$%&*/:<=>?^_`+.@0-9-]*)|([+-]|\\.\\.\\.))$"
+identifier = "^(([a-zA-Z!$%&*/:<=>?^_`-][a-zA-Z!$%&*/:<=>?^_`+.@0-9-]*)\
+                        \|([+-]|\\.\\.\\.))$"
 
 integer = "^[0-9]+$"
 string = "\"(\\.|[^\\\\\"])*\""

@@ -107,10 +107,10 @@ main = do
                             case codegen ast initialState False of
 
                             -- compile-time error
-                            Left err -> reportError err
+                            Failure errs _ -> reportErrors errs
 
                             -- write output to file
-                            Right (i, st) -> do
+                            Pass i _ -> do
                                 let outfp = lookupDefaultStr cnf OutFile defaultOutfile
                                 outf <- openFile outfp WriteMode
                                 Main.writeProgram cnf (i ++ [(Pop)]) outf
