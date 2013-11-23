@@ -10,6 +10,7 @@ import AST
 import Begin
 import Bytecode
 import Compiler
+import Error
 import Lexer
 import Data.Word
 
@@ -26,12 +27,12 @@ scopeAddDef :: Scope -> Define -> Scope
 scopeAddDef (Scope l e) d = (Scope (d:l) e)
 
 scopeAddExpr :: Scope -> AST -> Scope
-scopeAddExpr (Scope l (Begin e p)) expr = Scope l $ Begin (expr:e) p
+scopeAddExpr (Scope l (Begin e)) expr = Scope l $ Begin (expr:e)
 
 instance Show Scope where
     show (Scope defs expr) = "a scope with defines " ++ show defs ++ "/" ++ show expr
 
-compileDefines :: [Define] -> Word64 -> CompilerState -> Either String ([Instr], CompilerState)
+compileDefines :: [Define] -> Word64 -> CompilerState -> Either Error ([Instr], CompilerState)
 compileDefines [] _ st = return ([], st)
 compileDefines ((Define var (AST e) _) : r) i st =
     case codegen e st False of

@@ -8,6 +8,7 @@ import Bytecode
 import Compiler
 import Config
 import Debug
+import Error
 import Lexer
 import Parser
 import Serialize
@@ -90,7 +91,7 @@ main = do
                 logW cnf $ "Compiling file " ++ fp
                 h <- openFile fp ReadMode
                 contents <- hGetContents h
-                let prog = program contents
+                let prog = program contents fp
 
                 -- check syntax
                 case lexer prog >>= \t -> syntaxChecker t 0 of
@@ -99,14 +100,14 @@ main = do
                     Right toks -> case parser toks of
 
                         -- parsing failed
-                        Left err -> putStrLn err
+                        Left err -> reportError err
 
                         -- generate assembly
                         Right (AST ast) ->
                             case codegen ast initialState False of
 
                             -- compile-time error
-                            Left err -> print err
+                            Left err -> reportError err
 
                             -- write output to file
                             Right (i, st) -> do

@@ -4,6 +4,7 @@ module Apply
 ) where
 
 import AST
+import Error
 import Bytecode
 import Compiler
 import Data.Word
@@ -11,16 +12,16 @@ import Lexer
 
 -- a function call (f arg)
 
-data Apply = Apply AST [AST] Pos 
+data Apply = Apply AST [AST]
 
 instance Show Apply where
-    show (Apply func args _) = 
+    show (Apply func args) =
         let pargs = map show args
         in "(#%app " ++ show func ++ " " ++ show args ++ ")"
  
  -- compile the expressions passed as arguments
 
-compileArgs :: [AST] -> CompilerState -> Either String ([Instr], CompilerState)
+compileArgs :: [AST] -> CompilerState -> Either Error ([Instr], CompilerState)
 compileArgs [] st = return ([], st)
 compileArgs ((AST a) : rest) st =
     let exp1 = codegen a st False
@@ -37,7 +38,7 @@ compileArgs ((AST a) : rest) st =
 --   CALL 3             
 
 instance Expression Apply where
-    codegen (Apply (AST f) parms p) st pos =
+    codegen (Apply (AST f) parms) st pos =
         let args = compileArgs (reverse parms) st
         in args >>= \(a,st1) -> 
             let func = codegen f st1 False

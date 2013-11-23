@@ -9,6 +9,7 @@ module Compiler
     Expression(codegen)
 ) where
 
+import Error
 import Bytecode
 import Data.Word
 
@@ -61,6 +62,6 @@ envExtend e1 (e2, lbl) = (e1:e2, lbl)
 --   * If the current expression is in last-call-position
 
 class (Show a) => Expression a where
-    codegen :: a -> CompilerState -> Bool -> Either String ([Instr], CompilerState)
+    codegen :: a -> CompilerState -> Bool -> Either Error ([Instr], CompilerState)
 
     

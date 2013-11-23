@@ -10,6 +10,7 @@ Executable scmc
   Extensions: ExistentialQuantification
 
   Build-depends: 
+    ansi-terminal,
     base,
     binary,
     bytestring,

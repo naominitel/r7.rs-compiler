@@ -9,6 +9,7 @@ module Syntax
 
 -- Module for basic operations on the primary tree defined in the Tree module
 
+import Error
 import Lexer
 import Tree
 
@@ -20,7 +21,7 @@ type LetArgs = [(Token, TokenTree)]
 -- extracts the list of a let form formal args 
 -- e.g. ((e1 v1) (e2 v2)) -> [(e1, v1), (e2, v2)]
 
-letArgs :: [TokenTree] -> Either String LetArgs
+letArgs :: [TokenTree] -> Either Error LetArgs
 letArgs []                                              = return []
 letArgs (TokNode (TokLeaf t@(TokId _ _):val:[]) : rest) = letArgs rest >>= return . (:) (t, val)
 letArgs _                                               = fail "Malformed let parameter list"
@@ -28,14 +29,14 @@ letArgs _                                               = fail "Malformed let pa
 -- return the list of identifiers of the formal let args 
 -- e.g. [e1, e2, ..., en]
 
-letArgsIdentifiers :: LetArgs -> Either String [Token]
+letArgsIdentifiers :: LetArgs -> Either Error [Token]
 letArgsIdentifiers [] = return []
 letArgsIdentifiers ((i, tree) : r) = letArgsIdentifiers r >>= return . (:) i
 
 -- return the list of expressions of the formal let args
 -- e.g. [v1, v2, ..., vn]
 
-letArgsValues :: LetArgs -> Either String [TokenTree]
+letArgsValues :: LetArgs -> Either Error [TokenTree]
 letArgsValues [] = return []
 letArgsValues ((i, tree) : r) = letArgsValues r >>= return . (:) tree
 
@@ -44,7 +45,7 @@ letArgsValues ((i, tree) : r) = letArgsValues r >>= return . (:) tree
 -- The Maybe String represents the presence of a variadic parameter
 -- e.g. for (lambda (a b . c) ...) this returns ([a, b], (Just c))
 
-lambdaArgs :: [TokenTree] -> Either String ([String], Maybe String)
+lambdaArgs :: [TokenTree] -> Either Error ([String], Maybe String)
 lambdaArgs [] = return ([], Nothing)
 lambdaArgs (TokLeaf (TokId arg _) : r) = (lambdaArgs r) >>= \(a, v) ->
             return $ (arg : a, v)

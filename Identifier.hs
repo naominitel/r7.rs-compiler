@@ -6,6 +6,7 @@ module Identifier
 import Bytecode
 import Compiler
 import Data.Word
+import Error
 import Lexer
 
 -- An identifier, such as "var"
@@ -23,4 +24,4 @@ instance Expression Identifier where
             (Just envId) -> 
                 return ([Fetch (fromIntegral envId :: Word64)], st)
             (Nothing) -> 
-                fail $ "Unbound variable " ++ var ++ " at " ++ show p
+                Left $ Error ("Unbound variable " ++ var) p

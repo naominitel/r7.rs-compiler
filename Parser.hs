@@ -19,6 +19,7 @@ import Compiler
 import Constant
 import Datum
 import Define
+import Error
 import Identifier
 import If
 import Lambda
@@ -43,39 +44,18 @@ arborize (tok : s) =
     let (rec, cont) = arborize s
     in (TokLeaf tok : rec, cont)
 
----- The parser now expand the tree into a typed data structures, replacing
----- plain string lists by syntaxic elements of the core langage and 
----- expand them when necessary. 
----- Expanding rules are detailed in doc/expanding.
+-- The parser now expand the tree into a typed data structures, replacing
+-- plain string lists by syntaxic elements of the core langage and
+-- expand them when necessary.
+-- Expanding rules are detailed in doc/expanding.
 
----- The data structures used here are defined in the AST module
-
----- curryfy a function call
----- takes a lambda-expr and a list of args and return the curryfied form
----- (Apply ... (Apply f e1) ... en)
----- Arguments are passed in reverse order
-
---curryfiedCall :: AST -> [Either String AST] -> Pos -> Either String AST
---curryfiedCall lambda [] pos             = return lambda
---curryfiedCall lambda (Right arg:[]) pos = return $ Apply lambda arg pos
---curryfiedCall lambda (Right arg:rs) pos = curryfiedCall lambda rs pos >>= \a -> return $ Apply a arg pos
---curryfiedCall _ (Left s:_) _            = fail s
-
----- curryfy a lambda expression
----- (lambda (a b c) e) -> (lambda (a) (lambda (b) (lambda (c) e)))
----- takes the argument list and the return expr of the lambda expression
----- a lambda with no params is a constant : (lambda () e) -> e
-
---curryfiedLambda :: [String] -> AST -> Pos -> AST
---curryfiedLambda [] expr _         = expr
---curryfiedLambda (arg:[]) expr p   = (Lambda arg expr p)
---curryfiedLambda (arg:args) expr p = (Lambda arg (curryfiedLambda args expr p) p)
+-- The data structures used here are defined in the AST module
 
 -- expand: core of the parser. expands a TokenTree into an AST, which is
 -- basically the same thing with token sequences assembled into semantic objects
 -- Some langage constructs are translated to others.
 
-expand :: TokenTree -> Either String AST
+expand :: TokenTree -> Either Error AST
 
 -- Parsing for (let ((e1 v1) ... (en vn)) expr) -> ((lambda (e1 ... en) expr) v1 ... vn)
 
@@ -119,7 +99,7 @@ expand (TokNode (TokLeaf (TokIf p) : exprif : expr1 : expr2 : [])) =
     in ifexpr >>= return . AST
 
 expand (TokNode (TokLeaf (TokIf p) : _)) =
-    Left $ "Malformed if-expression at " ++ show p
+    Left $ Error "Malformed if-expression" p
 
 -- Parsing for (quote expr)
 
@@ -127,20 +107,20 @@ expand (TokNode (TokLeaf (TokQuote p) : expr : [])) =
     return $ AST $ Quote (getDatum expr) p
 
 expand (TokNode (TokLeaf (TokQuote p) : _)) =
-    fail $ "Malformed quote-expression at " ++ show p
+    Left $ Error "Malformed quote-expression" p
 
 -- Parsing for (begin expr)
 
 expand (TokNode (TokLeaf (TokBegin p) : exprs)) =
     let parsedExprs = mapM expand exprs
-    in parsedExprs >>= \e -> return $ AST $ Begin e p
+    in parsedExprs >>= \e -> return $ AST $ Begin e
 
 -- Parsing for function application (f a1 a2 a3)
 
 expand (TokNode (func : args)) = 
     let parsedFunc = expand func
         parsedArgs = mapM expand args 
-        expr =  (parsedFunc >>= return . Apply) <*> parsedArgs <*> return (Pos 0 0) -- FIXME
+        expr =  (parsedFunc >>= return . Apply) <*> parsedArgs
     in expr >>= return . AST
 
 expand (TokLeaf (TokDefine _)) = fail $ "Define not allowed in this context"
@@ -149,16 +129,16 @@ expand (TokLeaf (TokDefine _)) = fail $ "Define not allowed in this context"
 
 expand (TokLeaf (TokBool b p))  = return $ AST $ BoolConstant b p
 expand (TokLeaf (TokInt i p))   = return $ AST $ IntConstant i p
-expand (TokLeaf (TokId s p)) = return $ AST $ Identifier s p
+expand (TokLeaf (TokId s p))    = return $ AST $ Identifier s p
 
-mcons :: Either String a -> Either String b -> Either String (a, b)
+mcons :: Either Error a -> Either Error b -> Either Error (a, b)
 mcons (Left err) _ = Left err
 mcons _ (Left err) = Left err
 mcons (Right a) (Right b) = Right (a, b)
 
 -- parse a (define)
 
-parseDefine :: [TokenTree] -> Either String Define
+parseDefine :: [TokenTree] -> Either Error Define
 
 -- parsing for (define id expr)
 
@@ -176,7 +156,7 @@ parseDefine _ = fail $ "Malformed define expression"
 
 -- parse a list of token where a (define ...)* (expr ...)+ is expected
 
-parseBody :: [TokenTree] -> Either String Scope
+parseBody :: [TokenTree] -> Either Error Scope
 parseBody [] = fail $ "Empty body"
 parseBody (TokNode (TokLeaf (TokDefine _) : _) : []) = fail $ "Empty body"
 parseBody (TokNode (TokLeaf (TokDefine _) : d@_) : r) =
@@ -187,7 +167,7 @@ parseBody (TokNode (TokLeaf (TokDefine _) : d@_) : r) =
 parseBody (_ : TokNode (TokLeaf (TokDefine _) : _) : _) = fail $
     "(define) not allowed in an expression context"
 parseBody (expr : []) =
-    (expand expr) >>= \e -> Right $ Scope [] $ Begin [e] (Pos 0 0)
+    (expand expr) >>= \e -> Right $ Scope [] $ Begin [e]
 parseBody (expr : r) =
     let exp = expand expr
         scp = parseBody r
@@ -196,7 +176,7 @@ parseBody (expr : r) =
 
 -- parser: entry point for the parser
 
-parser :: [Token] -> Either String AST
+parser :: [Token] -> Either Error AST
 
 parser tokens = 
     case arborize tokens of

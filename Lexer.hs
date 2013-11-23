@@ -30,12 +30,12 @@ import Control.Monad.Instances
 import Data.Word
 import Text.Regex.Posix
 
--- Pos: position of a token in the file (Line, Column)
+-- Pos: position of a token in the file (Line, Column, Filename)
 
-data Pos = Pos Int Int
+data Pos = Pos Int Int String
 
 instance Show Pos where
-    show (Pos l c) = "(Line " ++ (show l) ++ ":" ++ (show c) ++ ")"
+    show (Pos l c f) = f ++ ":" ++ (show l) ++ ":" ++ (show c) ++ ""
 
 -- Token: basic data structure for a program lexical unit.
 --  * Open is an opening brace '('
@@ -88,14 +88,14 @@ tokPos (TokDot pos)     = pos
 
 type Program = (String, Pos)
 
-program :: String -> Program
-program str = (str, Pos 0 0)
+program :: String -> String -> Program
+program str fname = (str, Pos 1 1 fname)
 
 forward :: Pos -> Pos
-forward (Pos l c) = (Pos l $ c + 1)
+forward (Pos l c f) = (Pos l (c + 1) f)
 
 newline :: Pos -> Pos
-newline (Pos l c) = (Pos (l + 1) 0)
+newline (Pos l c f) = (Pos (l + 1) 0 f)
 
 -- cut: split the program into string tokens
 

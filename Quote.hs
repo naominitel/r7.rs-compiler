@@ -7,6 +7,7 @@ import AST
 import Bytecode
 import Compiler
 import Datum
+import Error
 import Lexer
 import Tree
 
@@ -14,7 +15,7 @@ import Tree
 
 data Quote = Quote Datum Pos
 
-compileDatum :: Datum -> CompilerState -> Either String ([Instr], CompilerState)
+compileDatum :: Datum -> CompilerState -> Either Error ([Instr], CompilerState)
 compileDatum (SimpleDatum constant) st = codegen constant st False
 
 instance Show Quote where
