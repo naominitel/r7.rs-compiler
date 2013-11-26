@@ -24,6 +24,7 @@ import Identifier
 import If
 import Lambda
 import Lexer
+import Library
 import Quote
 import Set
 import Syntax
@@ -116,6 +117,16 @@ expand (TokNode (TokLeaf (TokBegin p) : exprs)) =
     let parsedExprs = mapM expand exprs
     in parsedExprs >>= \e -> return $ AST $ Begin e
 
+-- Parsing for (define-library)
+
+expand (TokNode (TokLeaf (TokDeflib p) : (TokNode n) : stmts)) =
+    let bdy = parseBody stmts
+        name = parseLibname n
+    in (mcons bdy name) >>= \(bdy, name) -> return $ AST $ Library name bdy
+
+expand (TokNode (TokLeaf (TokDeflib p) : _)) =
+    Left $ Error "Malformed library definition" p
+
 -- Parsing for function application (f a1 a2 a3)
 
 expand (TokNode (func : args)) = 
@@ -136,6 +147,14 @@ mcons :: Either Error a -> Either Error b -> Either Error (a, b)
 mcons (Left err) _ = Left err
 mcons _ (Left err) = Left err
 mcons (Right a) (Right b) = Right (a, b)
+
+-- parse a library name
+
+parseLibname :: [TokenTree] -> Either Error LibName
+parseLibname [] = fail "Empty library name"[]
+parseLibname ((TokLeaf (TokId s p)) : []) = Right $ [s]
+parseLibname ((TokLeaf (TokId s p)) : r) = parseLibname r >>= Right . (:) s
+parseLibname _ = fail "Malformed library name"
 
 -- parse a (define)
 

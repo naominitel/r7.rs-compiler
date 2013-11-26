@@ -8,6 +8,7 @@ module Lexer
         TokClose, 
         TokBegin,
         TokDefine,
+        TokDeflib,
         TokIf, 
         TokLambda,
         TokLet,  
@@ -57,6 +58,7 @@ data Token
     | TokStr String Pos
     | TokId String Pos
     | TokDot Pos
+    | TokDeflib Pos
 
 instance Show Token where
     show (TokOpen pos)    = "Open"
@@ -65,6 +67,7 @@ instance Show Token where
     show (TokIf pos)      = "if"
     show (TokLambda pos)  = "lambda"
     show (TokLet pos)     = "let"
+    show (TokDeflib pos)  = "define-library"
     show (TokInt i pos)   = show i
     show (TokBool b pos)  = show b
     show (TokStr s pos)   = show s
@@ -77,6 +80,7 @@ tokPos (TokClose pos)   = pos
 tokPos (TokDefine pos)  = pos
 tokPos (TokIf pos)      = pos
 tokPos (TokLambda pos)  = pos
+tokPos (TokDeflib pos)  = pos
 tokPos (TokLet pos)     = pos
 tokPos (TokInt _ pos)   = pos  
 tokPos (TokBool _ pos)  = pos
@@ -130,23 +134,24 @@ string = "\"(\\.|[^\\\\\"])*\""
 -- Tokenize: core of the lexer, transforms the program into a token list
 
 tokenize :: (String, Pos) -> Either String Token
-tokenize (".", p)      = Right $ TokDot p
-tokenize ("(", p)      = Right $ TokOpen p
-tokenize (")", p)      = Right $ TokClose p
-tokenize ("let", p)    = Right $ TokLet p
-tokenize ("set!", p)   = Right $ TokSet p
-tokenize ("lambda", p) = Right $ TokLambda p
-tokenize ("define", p) = Right $ TokDefine p
-tokenize ("begin", p)  = Right $ TokBegin p
-tokenize ("quote", p)  = Right $ TokQuote p
-tokenize ("if", p)     = Right $ TokIf p
-tokenize ("#t", p)     = Right $ TokBool True p
-tokenize ("#f", p)     = Right $ TokBool False p
+tokenize (".", p)              = Right $ TokDot p
+tokenize ("(", p)              = Right $ TokOpen p
+tokenize (")", p)              = Right $ TokClose p
+tokenize ("let", p)            = Right $ TokLet p
+tokenize ("set!", p)           = Right $ TokSet p
+tokenize ("lambda", p)         = Right $ TokLambda p
+tokenize ("define", p)         = Right $ TokDefine p
+tokenize ("define-library", p) = Right $ TokDeflib p
+tokenize ("begin", p)          = Right $ TokBegin p
+tokenize ("quote", p)          = Right $ TokQuote p
+tokenize ("if", p)             = Right $ TokIf p
+tokenize ("#t", p)             = Right $ TokBool True p
+tokenize ("#f", p)             = Right $ TokBool False p
 tokenize (s, p)
-    | s =~ integer     = Right $ TokInt (read s :: Word64) p
-    | s =~ string      = Right $ TokStr (read s :: String) p
-    | s =~ identifier  = Right $ TokId s p
-    | otherwise        = Left $ "Unknown token " ++ s ++ " at " ++ show p
+    | s =~ integer             = Right $ TokInt (read s :: Word64) p
+    | s =~ string              = Right $ TokStr (read s :: String) p
+    | s =~ identifier          = Right $ TokId s p
+    | otherwise                = Left $ "Unknown token " ++ s ++ " at " ++ show p
      
 -- Check if the pairs of parenthesis are correct
 
