@@ -10,6 +10,7 @@ import Config
 import Debug
 import Error
 import Lexer
+import Module
 import Parser
 import Serialize
 
@@ -103,8 +104,8 @@ main = do
                         Left err -> reportError err
 
                         -- generate assembly
-                        Right (AST ast) ->
-                            case codegen ast initialState False of
+                        Right mod ->
+                            case compileModule mod of
 
                             -- compile-time error
                             Failure errs _ -> reportErrors errs
