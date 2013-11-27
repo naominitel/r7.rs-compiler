@@ -70,33 +70,46 @@ data Token
     | TokStr String Pos
 
 instance Show Token where
-    show (TokBegin _)   = "Begin"
-    show (TokOpen _)    = "Open"
-    show (TokClose _)   = "Close"
+    show (TokBegin _)   = "begin"
     show (TokDefine _)  = "define"
+    show (TokDeflib _)  = "define-library"
+    show (TokExcept _)  = "except"
     show (TokIf _)      = "if"
+    show (TokImport _)  = "import"
     show (TokLambda _)  = "lambda"
     show (TokLet _)     = "let"
-    show (TokDeflib _)  = "define-library"
+    show (TokOnly _)    = "only"
+    show (TokPrefix _)  = "prefix"
+    show (TokQuote _)   = "quote"
+    show (TokRename _)  = "rename"
+    show (TokSet _)     = "set!"
     show (TokDot _)     = "."
+    show (TokOpen _)    = "("
+    show (TokClose _)   = ")"
     show (TokBool b _)  = show b
     show (TokInt i _)   = show i
     show (TokStr s _)   = show s
     show (TokId t _)    = t
 
 tokPos :: Token -> Pos
+tokPos (TokBegin pos)   = pos
 tokPos (TokBool _ pos)  = pos
 tokPos (TokClose pos)   = pos
 tokPos (TokDefine pos)  = pos
 tokPos (TokDeflib pos)  = pos
+tokPos (TokExcept pos)  = pos
 tokPos (TokDot pos)     = pos
 tokPos (TokId _ pos)    = pos
 tokPos (TokIf pos)      = pos
+tokPos (TokImport pos)  = pos
 tokPos (TokInt _ pos)   = pos
 tokPos (TokLambda pos)  = pos
 tokPos (TokLet pos)     = pos
+tokPos (TokOnly pos)    = pos
 tokPos (TokOpen pos)    = pos
+tokPos (TokPrefix pos)  = pos
 tokPos (TokQuote pos)   = pos
+tokPos (TokRename pos)  = pos
 tokPos (TokSet pos)     = pos
 tokPos (TokStr _ pos)   = pos
 
@@ -111,7 +124,7 @@ forward :: Pos -> Pos
 forward (Pos l c f) = (Pos l (c + 1) f)
 
 newline :: Pos -> Pos
-newline (Pos l c f) = (Pos (l + 1) 1 f)
+newline (Pos l _ f) = (Pos (l + 1) 1 f)
 
 -- cut: split the program into string tokens
 
@@ -122,7 +135,7 @@ separator c
 
 cut :: Program -> [(String, Pos)]
 
-cut ([], pos)       = []
+cut ([], _)         = []
 cut ('(':s, pos)    = ("(", pos) : cut (s, forward pos)
 cut (')':s, pos)    = (")", pos) : cut (s, forward pos)
 cut ('\n':s, pos)   = cut (s, newline pos)
@@ -132,14 +145,18 @@ cut (' ':s, pos)    = cut (s, forward pos)
 cut (a:[], pos)     = ([a], pos) : []
 cut (a:c:s, pos)
     | separator c   = ([a], pos) : cut (c:s, forward pos)
-    | otherwise     = let ((n,p):r) = cut (c:s, forward pos) in (a:n, pos):r
+    | otherwise     = let ((n,_):r) = cut (c:s, forward pos) in (a:n, pos):r
 
 -- Regular expressions used to tokenize the program
 
+identifier :: String
 identifier = "^(([a-zA-Z!$%&*/:<=>?^_`-][a-zA-Z!$%&*/:<=>?^_`+.@0-9-]*)\
                         \|([+-]|\\.\\.\\.))$"
 
+integer :: String
 integer = "^[0-9]+$"
+
+string :: String
 string = "\"(\\.|[^\\\\\"])*\""
 
 
