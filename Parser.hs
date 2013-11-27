@@ -216,7 +216,7 @@ parseBody (expr : r) =
 
 parseImportSet :: [TokenTree] -> Either Error Imports
 
-parseImportSet [] = fail $ "Empty import set"
+parseImportSet [] = Right $ []
 
 parseImportSet (TokNode t : []) =
     let imp = parseImp t in
@@ -227,6 +227,19 @@ parseImportSet (TokNode h : t) =
         imp = parseImp h
     in (mcons rec imp) >>= \(r, i) -> Right $ i : r
 
+parseImportSet (TokLeaf t : _) = Left $ Error
+    ("parse error: expected an import specifier, but found: " ++ show t) (tokPos t)
+
+parseImports :: TokenTree -> Either Error Imports
+
+parseImports (TokNode (TokLeaf (TokImport p) : lst)) =
+    case parseImportSet lst of
+        Left err -> Left $ err
+        Right [] -> Left $ Error "empty import set" p
+        Right l -> Right $ l
+
+parseImports (TokLeaf tok) = Left $ Error
+    ("parse error: expected (import ... ), but found: " ++ show tok) (tokPos tok)
 
 -- parse a list of identifiers
 
@@ -312,8 +325,8 @@ parseProgramBody [] = fail $ "Empty program"
 parseProgramBody (TokNode (TokLeaf (TokImport p) : _) : []) = Left $
     Error "no program after an import sequence" p
 
-parseProgramBody (TokNode (TokLeaf (TokImport _) : s) : r) =
-    let set = parseImportSet s
+parseProgramBody (i@(TokNode (TokLeaf (TokImport _) : s)) : r) =
+    let set = parseImports i
         prog = parseProgramBody r
         c = mcons set prog
     in c >>= \(s, p) -> Right $ progAddImp p s
@@ -345,8 +358,8 @@ parseProgramOrLibrary :: [TokenTree] -> Either Error Module
 
 parseProgramOrLibrary [] = fail $ "Empty program"
 
-parseProgramOrLibrary (TokNode (TokLeaf (TokImport _) : s) : r) =
-    let set = parseImportSet s
+parseProgramOrLibrary (i@(TokNode (TokLeaf (TokImport _) : s)) : r) =
+    let set = parseImports i
         prog = parseProgramBody r
         c = mcons set prog
     in c >>= \(s, p) -> Right $ Prog $ progAddImp p s
