@@ -78,7 +78,7 @@ expand (TokNode (TokLeaf (TokLet p) : (TokNode bindings) : expr : [])) =
     in apply >>= expand
 
 expand (TokNode (TokLeaf (TokLet p) : _)) =
-    fail $ "Malformed let-expr at " ++ show p
+    Left $ Error "Malformed let-expr" p
 
 -- Parsing for (lambda (e1 ... en) expr)
 
@@ -89,7 +89,7 @@ expand (TokNode (TokLeaf (TokLambda p) : (TokNode lst) : exprs)) =
     in lbda >>= return . AST
 
 expand (TokNode (TokLeaf (TokLambda p) : _)) = 
-    fail $ "Malformed lambda-expr at " ++ show p
+    Left $ Error "Malformed lambda-expr" p
 
 -- Parsing for (set! id val)
 
@@ -97,7 +97,7 @@ expand (TokNode (TokLeaf (TokSet _) : (TokLeaf (TokId i p)) : expr : [])) =
     expand expr >>= \e -> return $ AST $ Set i e p
 
 expand (TokNode (TokLeaf (TokSet p) : _)) =
-    fail $ "Syntax error: malformed set!-expression at: " ++ show p
+    Left $ Error "Syntax error: malformed set!-expression" p
 
 -- Parsing for (if expr-bool expr-if expr-else)
 
@@ -143,13 +143,14 @@ expand (TokNode (func : args)) =
         expr =  (parsedFunc >>= return . Apply) <*> parsedArgs
     in expr >>= return . AST
 
-expand (TokLeaf (TokDefine _)) = fail $ "Define not allowed in this context"
-
 -- Parsing for anything else, like "var" or "1"
 
 expand (TokLeaf (TokBool b p))  = return $ AST $ BoolConstant b p
 expand (TokLeaf (TokInt i p))   = return $ AST $ IntConstant i p
 expand (TokLeaf (TokId s p))    = return $ AST $ Identifier s p
+
+expand (TokLeaf t) =
+    Left $ Error ("expected an expression, but found: " ++ show t) (tokPos t)
 
 mcons :: Either Error a -> Either Error b -> Either Error (a, b)
 mcons (Left err) _ = Left err
@@ -159,10 +160,13 @@ mcons (Right a) (Right b) = Right (a, b)
 -- parse a library name
 
 parseLibname :: [TokenTree] -> Either Error LibName
-parseLibname [] = fail "Empty library name"[]
-parseLibname ((TokLeaf (TokId s p)) : []) = Right $ [s]
-parseLibname ((TokLeaf (TokId s p)) : r) = parseLibname r >>= Right . (:) s
-parseLibname _ = fail "Malformed library name"
+parseLibname [] = Right []
+parseLibname (TokLeaf (TokId s p) : []) = Right $ [s]
+parseLibname (TokLeaf (TokId s p) : r) = parseLibname r >>= Right . (:) s
+parseLibname (TokLeaf t : _) = Left $ Error
+    ("unexpected token in library name: " ++ show t) (tokPos t)
+parseLibname (TokNode (TokLeaf t : _) : _) = Left $ Error
+    ("unexpected token in library name: " ++ show t) (tokPos t)
 
 -- parse a (define)
 
@@ -364,8 +368,13 @@ parseProgramOrLibrary (i@(TokNode (TokLeaf (TokImport _) : s)) : r) =
         c = mcons set prog
     in c >>= \(s, p) -> Right $ Prog $ progAddImp p s
 
-parseProgramOrLibrary _ =
-    fail "Expected either of (import ... ) or (define-library ... )"
+parseProgramOrLibrary (TokNode (TokLeaf t : _) : _) = Left $ Error
+    ("Expected either of (import ... ) or (define-library ... ) but found: "
+        ++ show t) (tokPos t)
+
+parseProgramOrLibrary (TokLeaf t : _) = Left $ Error
+    ("Expected either of (import ... ) or (define-library ... ) but found: "
+        ++ show t) (tokPos t)
 
 parser :: [Token] -> Either Error Module
 
