@@ -8,6 +8,8 @@ module Program
     progAddImp
 ) where
 
+import Data.Word
+
 import AST
 import Begin
 import Bytecode
@@ -38,16 +40,34 @@ getCommands [] = []
 getCommands (Def d : r) = getCommands r
 getCommands (Cmd c : r) = c : (getCommands r)
 
-toScope :: Program -> Scope
-toScope (Program _ b) =
-    let defs = getDefines b
-        cmds = getCommands b
-    in Scope defs (Begin cmds)
+-- The compilation of a program body is similar to the compilation of a scope
+-- body, except that defines and commands may be interleaved. We first allocate
+-- the environment for containing all the defines, then compile each (define)
+-- as a store and each command in the environment containg the defines.
+-- Every access to a variable defined by one of the (define) before it will
+-- cause a runtime error, whereas in the case of a scope body, it is a parse
+-- error
 
--- FIXME: currently we compile the program as if all the defines
--- were before any of the commandsd
+compileBody :: [CmdOrDef] -> Word64 -> State -> Result
+compileBody [] _ st = Pass [] st
+compileBody (Cmd (AST a) : r) i st =
+    let rec = codegen a st False in
+    continue rec
+        (compileBody r i)
+        (\irec ir -> irec ++ [(Pop)] ++ ir)
+compileBody (Def (Define var (AST e) _) : r) i st =
+    let rec = codegen e st False in
+    continue rec
+        (compileBody r $ i + 1)
+        (\irec ir -> irec ++ [(Store i)] ++ ir)
+
 compileProgram :: Program -> Result
-compileProgram p =
-    let sc = toScope p 
-        st = initialState 
-    in codegen sc st False
+compileProgram (Program _ defs) =
+    let defines = (getDefines defs)
+        envsize = fromIntegral (length defines) :: Word64
+        env = map (\(Define var _ _) -> var) defines
+        initst = envExtend env initialState
+        rec = compileBody defs 0 initst
+    in continue rec
+        (\st -> Pass [] st)
+        (\irec _ -> [Alloc envsize] ++ irec)

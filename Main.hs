@@ -114,7 +114,7 @@ main = do
                             Pass i _ -> do
                                 let outfp = lookupDefaultStr cnf OutFile defaultOutfile
                                 outf <- openFile outfp WriteMode
-                                Main.writeProgram cnf (i ++ [(Pop)]) outf
+                                Main.writeProgram cnf i outf
                                 hClose outf
 
                     -- syntax verification failed
