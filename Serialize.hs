@@ -26,6 +26,8 @@ import Data.Word
 import System.IO
 
 import Bytecode
+import Library
+import Module
 
 -- computes the length (bytes) of the serialized version of a single instruction
 
@@ -201,12 +203,35 @@ toAscii []    = []
 toAscii (c:s) = (fromIntegral (ord c) :: Word8) : toAscii s
 
 -- creates the imports offset
--- FIXME: creates an empty section for now
 
-createImportSection :: [String] -> Put
-createImportSection _ = putWord64be 0
+putLibName :: LibName -> Put
+putLibName name = do
+    let len = fromIntegral (Prelude.length name) :: Word64
+    putWord64be len
+    let aux = \part ->
+            case part of
+                [] -> return ()
+                str : t -> do
+                    let astr = BS.pack $ toAscii str
+                    let slen = fromIntegral (BS.length astr) :: Word64
+                    putWord64be slen
+                    putByteString astr
+                    aux t
+    aux name
 
-createExportSection :: [String] -> Put
+createImportSection :: [LibName] -> Put
+createImportSection imps = do
+    let len = fromIntegral (Prelude.length imps) :: Word64
+    putWord64be len
+    let aux = \lst ->
+            case lst of
+                [] -> return ()
+                h : t -> do
+                    putLibName h
+                    aux t
+    aux imps
+
+createExportSection :: Word64 -> Put
 createExportSection _ = putWord64be 0
 
 -- creates the symbol table
@@ -238,8 +263,8 @@ createSymbolTable set =
 alignOffset :: Word64 -> Word64
 alignOffset off = off - (off `mod` 0x10) + 0x10
 
-writeProgram :: [Instr] -> Handle -> IO ()
-writeProgram prog h = do
+writeProgram :: CompiledModule -> Handle -> IO ()
+writeProgram (Mod exps imps prog) h = do
     let symbols   = getSymbols prog
 
     let sym_off   = 0x40 -- header_size
@@ -247,11 +272,11 @@ writeProgram prog h = do
     let symt_len  = (fromIntegral (BS.length sym_table) :: Word64)
 
     let imp_off   = alignOffset $ sym_off + symt_len
-    let imports   = BS.concat $ BL.toChunks $ runPut $ createImportSection []
+    let imports   = BS.concat $ BL.toChunks $ runPut $ createImportSection imps
     let imp_len   = (fromIntegral (BS.length imports) :: Word64)
 
     let exp_off   = alignOffset $ imp_off + imp_len
-    let exports   = BS.concat $ BL.toChunks $ runPut $ createExportSection []
+    let exports   = BS.concat $ BL.toChunks $ runPut $ createExportSection exps
     let exp_len   = (fromIntegral (BS.length exports) :: Word64)
 
     let text_off  = alignOffset $ exp_off + exp_len

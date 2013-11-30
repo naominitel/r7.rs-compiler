@@ -59,9 +59,9 @@ writeAssembly (i:rest) h = do
 
 -- writeProgram: write ouput to file (assembly or bin, depending on config)
 
-writeProgram :: Config -> [Instr] -> Handle -> IO ()
+writeProgram :: Config -> CompiledModule -> Handle -> IO ()
 writeProgram cnf = case Config.lookup cnf AssembleOnly of
-    True -> writeAssembly
+    True -> \m -> let (Mod _ _ instrs) = m in writeAssembly instrs
     False -> Serialize.writeProgram
 
 -- main: read command line arguments, and run compiler
@@ -108,13 +108,13 @@ main = do
                             case compileModule mod of
 
                             -- compile-time error
-                            Failure errs _ -> reportErrors errs
+                            Left errs -> reportErrors errs
 
                             -- write output to file
-                            Pass i _ -> do
+                            Right mod -> do
                                 let outfp = lookupDefaultStr cnf OutFile defaultOutfile
                                 outf <- openFile outfp WriteMode
-                                Main.writeProgram cnf i outf
+                                Main.writeProgram cnf mod outf
                                 hClose outf
 
                     -- syntax verification failed

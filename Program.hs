@@ -3,6 +3,7 @@ module Program
     Program(Program),
     CmdOrDef(Cmd, Def),
     compileProgram,
+    importedLibs,
     progAddDef,
     progAddExpr,
     progAddImp
@@ -17,9 +18,22 @@ import Compiler
 import Define
 import Error
 import Imports
+import Library
 
 data CmdOrDef = Cmd AST | Def Define
 data Program = Program [Imports] [CmdOrDef]
+
+importedLibs :: Program -> [LibName]
+importedLibs (Program imps _) =
+    let aux = \imp ->
+            case imp of
+                Only i _ -> aux i
+                Except i _ -> aux i
+                Prefix i _ -> aux i
+                Rename i _ -> aux i
+                Lib lname -> [lname]
+    in concat $ map aux $ concat imps
+
 
 progAddDef :: Program -> Define -> Program
 progAddDef (Program i defs) d = Program i (Def d : defs)
