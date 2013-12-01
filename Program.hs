@@ -20,7 +20,7 @@ import Error
 import Imports
 import Library
 
-data CmdOrDef = Cmd AST | Def Define
+data CmdOrDef = Cmd Expression | Def Define
 data Program = Program [Imports] [CmdOrDef]
 
 importedLibs :: Program -> [LibName]
@@ -34,11 +34,10 @@ importedLibs (Program imps _) =
                 Lib lname -> [lname]
     in concat $ map aux $ concat imps
 
-
 progAddDef :: Program -> Define -> Program
 progAddDef (Program i defs) d = Program i (Def d : defs)
 
-progAddExpr :: Program -> AST -> Program
+progAddExpr :: Program -> Expression -> Program
 progAddExpr (Program i defs) e = Program i (Cmd e : defs)
 
 progAddImp :: Program -> Imports -> Program
@@ -49,7 +48,7 @@ getDefines [] = []
 getDefines (Def d : r) = d : (getDefines r)
 getDefines (Cmd c : r) = getDefines r
 
-getCommands :: [CmdOrDef] -> [AST]
+getCommands :: [CmdOrDef] -> [Expression]
 getCommands [] = []
 getCommands (Def d : r) = getCommands r
 getCommands (Cmd c : r) = c : (getCommands r)
@@ -64,12 +63,12 @@ getCommands (Cmd c : r) = c : (getCommands r)
 
 compileBody :: [CmdOrDef] -> Word64 -> State -> Result
 compileBody [] _ st = Pass [] st
-compileBody (Cmd (AST a) : r) i st =
+compileBody (Cmd (Expr a) : r) i st =
     let rec = codegen a st False in
     continue rec
         (compileBody r i)
         (\irec ir -> irec ++ [(Pop)] ++ ir)
-compileBody (Def (Define var (AST e) _) : r) i st =
+compileBody (Def (Define var (Expr e) _) : r) i st =
     let rec = codegen e st False in
     continue rec
         (compileBody r $ i + 1)

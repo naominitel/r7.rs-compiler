@@ -5,7 +5,6 @@ module Library
 ) where
 
 import AST
-import Compiler
 import Define
 
 type LibName = [String]
@@ -14,6 +13,5 @@ data Library = Library LibName Scope
 instance Show Library where
     show (Library n a) = "(define-library " ++ show n ++ " " ++ show a
 
-instance Expression Library where
-    codegen (Library _ _) =
-        fail "Unimplemented"
+instance Expand Library where
+    expand ctxt (Library n sc) = Library n $ expand ctxt sc

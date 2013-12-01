@@ -12,18 +12,18 @@ import Lexer
 
 -- a function call (f arg)
 
-data Apply = Apply AST [AST]
+data Apply = Apply Expression [Expression]
 
 instance Show Apply where
     show (Apply func args) =
         let pargs = map show args
-        in "(#%app " ++ show func ++ " " ++ show args ++ ")"
+        in "(#%app " ++ show func ++ " " ++ show pargs ++ ")"
  
  -- compile the expressions passed as arguments
 
-compileArgs :: [AST] -> State -> Result
+compileArgs :: [Expression] -> State -> Result
 compileArgs [] st = Pass [] st
-compileArgs ((AST a) : rest) st =
+compileArgs ((Expr a) : rest) st =
     let exp1 = codegen a st False in
     continue exp1 (\st1 -> compileArgs rest st1) (++)
 
@@ -35,8 +35,11 @@ compileArgs ((AST a) : rest) st =
 --   <compilation of the f expression>
 --   CALL 3             
 
-instance Expression Apply where
-    codegen (Apply (AST f) parms) st pos =
+instance Expand Apply where
+    expand ctx (Apply f args) = Apply (expand ctx f) (map (expand ctx) args)
+
+instance CompileExpr Apply where
+    codegen (Apply (Expr f) parms) st pos =
         let args = compileArgs (reverse parms) st in
         continue args
             (\st -> codegen f st False)

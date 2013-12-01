@@ -10,13 +10,16 @@ import Lexer
 
 -- a conditional branching (if expr_true expr_false)
 
-data If = If AST AST AST Pos
+data If = If Expression Expression Expression Pos
 
 instance Show If where
     show (If ec et ef _) = "(if " ++ show ec ++ show et ++ show ef ++ ")"
+
+instance Expand If where
+    expand c (If ec et ef p) = If (expand c ec) (expand c et) (expand c ef) p
  
-instance Expression If where
-    codegen (If (AST ec) (AST et) (AST ef) _) st p =
+instance CompileExpr If where
+    codegen (If (Expr ec) (Expr et) (Expr ef) _) st p =
         let (onfalse, st1) = nextLabel st
             (contlbl, st2) = nextLabel st1
             cond = codegen ec st2 False

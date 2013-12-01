@@ -10,13 +10,16 @@ import Data.Word
 import Error
 import Lexer
 
-data Set = Set String AST Pos
+data Set = Set String Expression Pos
 
 instance Show Set where
     show (Set var expr _) = "(set! " ++ var ++ " " ++ show expr ++ ")"
 
-instance Expression Set where
-    codegen (Set i (AST expr) p) st@(env, lbl) _ =
+instance Expand Set where
+    expand ctxt (Set s e p) = Set s (expand ctxt e) p
+
+instance CompileExpr Set where
+    codegen (Set i (Expr expr) p) st@(env, lbl) _ =
         case envFetch i env of
             Just envId ->
                 let rec = codegen expr st False in

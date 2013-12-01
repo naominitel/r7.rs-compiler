@@ -8,14 +8,18 @@ import Bytecode
 import Compiler
 import Lexer
 
-data Begin = Begin [AST]
+data Begin = Begin [Expression]
 
 instance Show Begin where
     show (Begin asts) = "(begin " ++ show asts ++ ")"
 
-instance Expression Begin where
-    codegen (Begin ((AST a) : [])) st p = codegen a st p
-    codegen (Begin ((AST a) : rest)) (e, l) pos =
+instance Expand Begin where
+    expand ctxt (Begin exprs) =
+        Begin $ map (expand ctxt) exprs
+
+instance CompileExpr Begin where
+    codegen (Begin ((Expr a) : [])) st p = codegen a st p
+    codegen (Begin ((Expr a) : rest)) (e, l) pos =
         let ret = codegen a (e, l) False in
         continue ret
             (\st -> codegen (Begin rest) st pos)

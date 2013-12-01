@@ -4,8 +4,8 @@
 module Parser 
 ( 
     arborize, 
-    expand, 
-    parser 
+    parseExpr,
+    parser
 ) where
 
 import Control.Applicative
@@ -55,101 +55,91 @@ arborize (tok : s) =
 -- The parser now expand the tree into a typed data structures, replacing
 -- plain string lists by syntaxic elements of the core langage and
 -- expand them when necessary.
--- Expanding rules are detailed in doc/expanding.
+-- Expanding rules are detailed in doc/parseExpring.
 
 -- The data structures used here are defined in the AST module
 
--- expand: core of the parser. expands a TokenTree into an AST, which is
+-- parseExpr: core of the parser. expands a TokenTree into an AST, which is
 -- basically the same thing with token sequences assembled into semantic objects
 -- Some langage constructs are translated to others.
 
-expand :: TokenTree -> Either Error AST
+parseExpr :: TokenTree -> Either Error Expression
 
 -- Parsing for (let ((e1 v1) ... (en vn)) expr)
 --   -> ((lambda (e1 ... en) expr) v1 ... vn)
 
-expand (TokNode (TokLeaf (TokLet p) : (TokNode bindings) : expr : [])) =
+parseExpr (TokNode (TokLeaf (TokLet p) : (TokNode bindings) : expr : [])) =
     let args   = letArgs bindings
         ids    = args >>= letArgsIdentifiers
         vals   = args >>= letArgsValues
         lambda = ids >>= \i -> return $ TokNode $
             TokLeaf (TokLambda p) : (TokNode $ map TokLeaf i) : expr : []
         apply  = (vals >>= \v -> return $ \l -> TokNode (l:v)) <*> lambda
-    in apply >>= expand
+    in apply >>= parseExpr
 
-expand (TokNode (TokLeaf (TokLet p) : _)) =
+parseExpr (TokNode (TokLeaf (TokLet p) : _)) =
     Left $ Error "Malformed let-expr" p
 
 -- Parsing for (lambda (e1 ... en) expr)
 
-expand (TokNode (TokLeaf (TokLambda p) : (TokNode lst) : exprs)) =
+parseExpr (TokNode (TokLeaf (TokLambda p) : (TokNode lst) : exprs)) =
     let args = lambdaArgs lst
-        body = (parseBody exprs) >>= return . AST
+        body = parseBody exprs
         lbda = (args >>= \(a, v) -> return $ Lambda a v) <*> body <*> return p
-    in lbda >>= return . AST
+    in lbda >>= return . Expr
 
-expand (TokNode (TokLeaf (TokLambda p) : _)) = 
+parseExpr (TokNode (TokLeaf (TokLambda p) : _)) =
     Left $ Error "Malformed lambda-expr" p
 
 -- Parsing for (set! id val)
 
-expand (TokNode (TokLeaf (TokSet _) : (TokLeaf (TokId i p)) : expr : [])) =
-    expand expr >>= \e -> return $ AST $ Set i e p
+parseExpr (TokNode (TokLeaf (TokSet _) : (TokLeaf (TokId i p)) : expr : [])) =
+    parseExpr expr >>= \e -> return $ Expr $ Set i e p
 
-expand (TokNode (TokLeaf (TokSet p) : _)) =
+parseExpr (TokNode (TokLeaf (TokSet p) : _)) =
     Left $ Error "Syntax error: malformed set!-expression" p
 
 -- Parsing for (if expr-bool expr-if expr-else)
 
-expand (TokNode (TokLeaf (TokIf p) : exprif : expr1 : expr2 : [])) =
-    let parsedif = expand exprif
-        parsed1  = expand expr1
-        parsed2  = expand expr2
+parseExpr (TokNode (TokLeaf (TokIf p) : exprif : expr1 : expr2 : [])) =
+    let parsedif = parseExpr exprif
+        parsed1  = parseExpr expr1
+        parsed2  = parseExpr expr2
         ifexpr = (parsedif >>= return . If) <*> parsed1 <*> parsed2 <*> return p
-    in ifexpr >>= return . AST
+    in ifexpr >>= return . Expr
 
-expand (TokNode (TokLeaf (TokIf p) : _)) =
+parseExpr (TokNode (TokLeaf (TokIf p) : _)) =
     Left $ Error "Malformed if-expression" p
 
 -- Parsing for (quote expr)
 
-expand (TokNode (TokLeaf (TokQuote p) : expr : [])) = 
-    return $ AST $ Quote (getDatum expr) p
+parseExpr (TokNode (TokLeaf (TokQuote p) : expr : [])) =
+    return $ Expr $ Quote (getDatum expr) p
 
-expand (TokNode (TokLeaf (TokQuote p) : _)) =
+parseExpr (TokNode (TokLeaf (TokQuote p) : _)) =
     Left $ Error "Malformed quote-expression" p
 
 -- Parsing for (begin expr)
 
-expand (TokNode (TokLeaf (TokBegin p) : exprs)) =
-    let parsedExprs = mapM expand exprs
-    in parsedExprs >>= \e -> return $ AST $ Begin e
-
--- Parsing for (define-library)
-
-expand (TokNode (TokLeaf (TokDeflib p) : (TokNode n) : stmts)) =
-    let bdy = parseBody stmts
-        name = parseLibname n
-    in (mcons bdy name) >>= \(bdy, name) -> return $ AST $ Library name bdy
-
-expand (TokNode (TokLeaf (TokDeflib p) : _)) =
-    Left $ Error "Malformed library definition" p
+parseExpr (TokNode (TokLeaf (TokBegin p) : exprs)) =
+    let parsedExprs = mapM parseExpr exprs
+    in parsedExprs >>= \e -> return $ Expr $ Begin e
 
 -- Parsing for function application (f a1 a2 a3)
 
-expand (TokNode (func : args)) = 
-    let parsedFunc = expand func
-        parsedArgs = mapM expand args 
+parseExpr (TokNode (func : args)) =
+    let parsedFunc = parseExpr func
+        parsedArgs = mapM parseExpr args
         expr =  (parsedFunc >>= return . Apply) <*> parsedArgs
-    in expr >>= return . AST
+    in expr >>= return . Expr
 
 -- Parsing for anything else, like "var" or "1"
 
-expand (TokLeaf (TokBool b p))  = return $ AST $ BoolConstant b p
-expand (TokLeaf (TokInt i p))   = return $ AST $ IntConstant i p
-expand (TokLeaf (TokId s p))    = return $ AST $ Identifier s p
+parseExpr (TokLeaf (TokBool b p))  = return $ Expr $ BoolConstant b p
+parseExpr (TokLeaf (TokInt i p))   = return $ Expr $ IntConstant i p
+parseExpr (TokLeaf (TokId s p))    = return $ Expr $ Identifier s p
 
-expand (TokLeaf t) =
+parseExpr (TokLeaf t) =
     Left $ Error ("expected an expression, but found: " ++ show t) (tokPos t)
 
 mcons :: Either Error a -> Either Error b -> Either Error (a, b)
@@ -175,13 +165,13 @@ parseDefine :: [TokenTree] -> Either Error Define
 -- parsing for (define id expr)
 
 parseDefine (TokLeaf (TokId i p) : expr : []) =
-    expand expr >>= \e -> return $ Define i e p
+    parseExpr expr >>= \e -> return $ Define i e p
 
 -- Parsing for (define (id args) expr...) -> (define id (lambda (args)) expr)
 
 parseDefine (TokNode (TokLeaf (TokId i p) : args) : expr) =
     let lambda = (TokNode (TokLeaf (TokLambda p) : (TokNode args) : expr))
-        parsedLambda = expand lambda
+        parsedLambda = parseExpr lambda
     in parsedLambda >>= \l -> return $ Define i l p
 
 parseDefine _ = fail $ "Malformed define expression"
@@ -206,10 +196,10 @@ parseBody (_ : TokNode (TokLeaf (TokDefine p) : _) : _) = Left $
     Error "expected command or expression, but found (define ... )" p
 
 parseBody (expr : []) =
-    (expand expr) >>= \e -> Right $ Scope [] $ Begin [e]
+    (parseExpr expr) >>= \e -> Right $ Scope [] $ Begin [e]
 
 parseBody (expr : r) =
-    let exp = expand expr
+    let exp = parseExpr expr
         scp = parseBody r
         c = mcons exp scp
     in c >>= \(e, r) -> Right $ scopeAddExpr r e
@@ -343,7 +333,7 @@ parseProgramBody (def : []) = case def of
         let def = parseDefine d in
         def >>= \d -> Right $ Program [] [Def d]
     expr ->
-        let e = expand expr in
+        let e = parseExpr expr in
         e >>= \e -> Right $ Program [] [Cmd e]
 
 parseProgramBody (def : r) = case def of
@@ -352,9 +342,21 @@ parseProgramBody (def : r) = case def of
             prog = parseProgramBody r
         in (mcons def prog) >>= \(d, p) -> Right $ progAddDef p d
     expr ->
-        let e = expand expr
+        let e = parseExpr expr
             prog = parseProgramBody r
         in (mcons e prog) >>= \(e, p) -> Right $ progAddExpr p e
+
+-- Parsing for (define-library)
+
+parseLib :: TokenTree -> Either Error Library
+
+parseLib (TokNode (TokLeaf (TokDeflib p) : (TokNode n) : stmts)) =
+    let bdy = parseBody stmts
+        name = parseLibname n
+    in (mcons bdy name) >>= \(bdy, name) -> return $ Library name bdy
+
+parseLib (TokNode (TokLeaf (TokDeflib p) : _)) =
+    Left $ Error "Malformed library definition" p
 
 -- parser: entry point for the parser
 

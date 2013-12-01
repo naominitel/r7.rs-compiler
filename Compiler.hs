@@ -1,7 +1,8 @@
 module Compiler
 (
+    CompileExpr(codegen),
     Env,
-    Expression(codegen),
+    Expression(Expr),
     Result(Failure, Pass),
     State,
     continue,
@@ -13,8 +14,9 @@ module Compiler
 
 import Data.Word
 
-import Error
+import AST
 import Bytecode
+import Error
 
 -- This module contains various definition for code generation
 
@@ -80,6 +82,15 @@ continue ret next gen =
                 Failure errs s -> cont
                 Pass i s -> Pass (gen instrs i) s
 
-class (Show a) => Expression a where
+-- Wrapper type around expression types to be used by compiler functions
+
+data Expression = forall a. CompileExpr a => Expr a
+
+class (Expand a) => CompileExpr a where
     codegen :: a -> State -> Bool -> Result
 
+instance Show Expression where
+    show (Expr e) = show e
+
+instance Expand Expression where
+    expand ctx (Expr a) = Expr $ expand ctx a

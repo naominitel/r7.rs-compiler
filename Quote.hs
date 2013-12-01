@@ -20,7 +20,10 @@ compileDatum (SimpleDatum constant) st = codegen constant st False
 
 instance Show Quote where
     show (Quote s _) = show s
+
+instance Expand Quote where
+    expand ctx quote = quote
  
-instance Expression Quote where
+instance CompileExpr Quote where
     codegen (Quote dat _) st _ = compileDatum dat st
     

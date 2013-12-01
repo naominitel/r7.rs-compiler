@@ -6,6 +6,7 @@ module Lambda
 import AST
 import Bytecode
 import Compiler
+import Define
 import Lexer
 import Identifier
 import Data.Word
@@ -15,21 +16,24 @@ import Data.Word
 --   * The Maybe String is (optionally), the variadic argument
 --   * The AST is the expression
 
-data Lambda = Lambda [String] (Maybe String) AST Pos
+data Lambda = Lambda [String] (Maybe String) Scope Pos
 
 instance Show Lambda where
     show (Lambda args _ expr _) = "(lambda " ++ show args ++ " " ++ show expr ++ ")"
  
 -- Assembly code generation for Lambda expressions
 
-instance Expression Lambda where
-    codegen (Lambda args v (AST expr) p) st _ =
+instance Expand Lambda where
+    expand ctxt (Lambda args var bdy p) = (Lambda args var (expand ctxt bdy) p)
+
+instance CompileExpr Lambda where
+    codegen (Lambda args v expr p) st _ =
         let (flbl, st1) = nextLabel st
             (clbl, st2@(e, _)) = nextLabel st1
             st3 = case v of
                 (Just var) -> envExtend (args ++ [var]) st2
                 (Nothing) -> envExtend args st2
-            rec = (codegen expr st3 True)
+            rec = compileScope expr st3
             instrs1 = [Jump clbl, Label flbl]
             instrs2 = [Return, Label clbl,
                 Push (TFunc flbl (fromIntegral (length args) :: Word8)
