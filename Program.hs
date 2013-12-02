@@ -84,3 +84,17 @@ compileProgram (Program _ defs) =
     in continue rec
         (\st -> Pass [] st)
         (\irec _ -> [Alloc envsize] ++ irec)
+
+instance Show CmdOrDef where
+    show (Cmd c) = show c
+    show (Def d) = show d
+
+instance Expand CmdOrDef where
+    expand ctx (Def d) = Def $ expand ctx d
+    expand ctx (Cmd c) = Cmd $ expand ctx c
+
+instance Show Program where
+    show (Program i cmds) = (show cmds)
+
+instance Expand Program where
+    expand ctx (Program i cmds) = Program i $ map (expand ctx) cmds

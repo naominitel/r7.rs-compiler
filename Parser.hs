@@ -346,17 +346,52 @@ parseProgramBody (def : r) = case def of
             prog = parseProgramBody r
         in (mcons e prog) >>= \(e, p) -> Right $ progAddExpr p e
 
--- Parsing for (define-library)
+-- Parse a library declaration
+-- formal syntax:
+--   (library_declaration) ->
 
-parseLib :: TokenTree -> Either Error Library
+parseLibBegin :: [TokenTree] -> Library -> Either Error Library
 
-parseLib (TokNode (TokLeaf (TokDeflib p) : (TokNode n) : stmts)) =
-    let bdy = parseBody stmts
-        name = parseLibname n
-    in (mcons bdy name) >>= \(bdy, name) -> return $ Library name bdy
+parseLibBegin [] l = Right l
 
-parseLib (TokNode (TokLeaf (TokDeflib p) : _)) =
-    Left $ Error "Malformed library definition" p
+parseLibBegin (TokNode (TokLeaf (TokDefine _) : d) : r) l =
+    let def = parseDefine d
+        lib = parseLibBegin r l
+        c = mcons def lib
+    in c >>= \(d, l) -> Right $ libAddDef l d
+
+parseLibBegin (expr : r) l =
+    let e = parseExpr expr
+        lib = parseLibBegin r l
+        c = mcons e lib
+    in c >>= \(e, l) -> Right $ libAddExpr l e
+
+parseLibDecl :: [TokenTree] -> Library -> Either Error Library
+
+parseLibDecl [] l = Right $ l
+
+parseLibDecl (i@(TokNode (TokLeaf (TokImport _) : _)) : r) l =
+    let lib = parseLibDecl r l
+        imp = parseImports i
+        c = mcons lib imp
+    in c >>= \(l, i) -> Right $ libAddImp l i
+
+parseLibDecl (TokNode (TokLeaf (TokBegin _) : b) : r) l =
+    let lib = parseLibDecl r l in
+    lib >>= parseLibBegin b
+
+-- Parse a library definition.
+-- formal syntax:
+--   (library_definition) ->
+--     (library name)
+--     (library_declaration)*
+
+parseLib :: [TokenTree] -> Either Error Library
+
+parseLib (TokNode ln : r) =
+    let name = parseLibname ln
+        lib = name >>= \n -> return $ Library n [] []
+    in lib >>= parseLibDecl r
 
 -- parser: entry point for the parser
 
@@ -369,6 +404,9 @@ parseProgramOrLibrary (i@(TokNode (TokLeaf (TokImport _) : s)) : r) =
         prog = parseProgramBody r
         c = mcons set prog
     in c >>= \(s, p) -> Right $ Prog $ progAddImp p s
+
+parseProgramOrLibrary (TokNode (TokLeaf (TokDeflib _) : l) : _) =
+    parseLib l >>= \lib -> Right $ Module.Lib $ lib
 
 parseProgramOrLibrary (TokNode (TokLeaf t : _) : _) = Left $ Error
     ("Expected either of (import ... ) or (define-library ... ) but found: "

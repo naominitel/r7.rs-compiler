@@ -10,6 +10,7 @@ import Data.Word
 import Bytecode
 import Compiler
 import Error
+import Imports
 import Lexer
 import Library
 import Program
@@ -22,7 +23,7 @@ compileModule (Prog p) =
         Failure errs st -> Left errs
         Pass instrs st -> Right $ Mod 0 (importedLibs p) instrs
 
-compileModule (Lib l) = Left [Error "Unimplemented" (Pos 0 0 "")]
+compileModule (Module.Lib l) = Left [Error "Unimplemented" (Pos 0 0 "")]
 
 -- A compiled module
 

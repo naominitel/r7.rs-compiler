@@ -26,7 +26,7 @@ import Data.Word
 import System.IO
 
 import Bytecode
-import Library
+import Imports
 import Module
 
 -- computes the length (bytes) of the serialized version of a single instruction

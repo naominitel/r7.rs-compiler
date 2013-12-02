@@ -1,11 +1,13 @@
 module Imports
 (
     Imports,
-    Import(Lib, Only, Except, Prefix, Rename)
+    Import(Lib, Only, Except, Prefix, Rename),
+    LibName
 ) where
 
 import Identifier
-import Library
+
+type LibName = [String]
 
 data Import
     = Lib LibName
