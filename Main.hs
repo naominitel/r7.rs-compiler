@@ -101,7 +101,9 @@ main = do
                     Right toks -> case parser toks of
 
                         -- parsing failed
-                        Left err -> reportError err
+                        Left err -> do
+                            reportError err
+                            fail $ "Aborting due to previous error"
 
                         -- generate assembly
                         Right mod ->
