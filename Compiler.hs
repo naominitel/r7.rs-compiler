@@ -32,7 +32,7 @@ initialState = ([primEnv], 0)
 
 primEnv :: [String]
 primEnv = ["+", "-", "*", "/", "=", "eq?", "list", "cons", "car", "cdr",
-        "display", "newline", "set-car!", "set-cdr!", "exit"]
+        "display", "newline", "set-car!", "set-cdr!", "exit", "assert"]
 
 -- utility function used by primFetch or envFetch to return the index of an item
 
