@@ -408,13 +408,9 @@ parseProgramOrLibrary (i@(TokNode (TokLeaf (TokImport _) : s)) : r) =
 parseProgramOrLibrary (TokNode (TokLeaf (TokDeflib _) : l) : _) =
     parseLib l >>= \lib -> Right $ Module.Lib $ lib
 
-parseProgramOrLibrary (TokNode (TokLeaf t : _) : _) = Left $ Error
-    ("Expected either of (import ... ) or (define-library ... ) but found: "
-        ++ show t) (tokPos t)
-
-parseProgramOrLibrary (TokLeaf t : _) = Left $ Error
-    ("Expected either of (import ... ) or (define-library ... ) but found: "
-        ++ show t) (tokPos t)
+parseProgramOrLibrary t =
+    let prog = parseProgramBody t in
+    prog >>= \p -> Right $ Prog $ p
 
 parser :: [Token] -> Either Error Module
 
