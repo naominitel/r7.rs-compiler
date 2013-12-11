@@ -10,6 +10,7 @@ import Define
 import Lexer
 import Identifier
 import Data.Word
+import Result
 
 -- a lambda-expression, (lambda arg expr)
 --   * The [String] is the list of formal arguments
@@ -27,20 +28,18 @@ instance Expand Lambda where
     expand ctxt (Lambda args var bdy p) = (Lambda args var (expand ctxt bdy) p)
 
 instance CompileExpr Lambda where
-    codegen (Lambda args v expr p) st _ =
+    codegen (Lambda args v expr p) st _ = do
         let (flbl, st1) = nextLabel st
-            (clbl, st2@(e, _)) = nextLabel st1
-            st3 = case v of
+        let (clbl, st2@(e, _)) = nextLabel st1
+        let st3 = case v of
                 (Just var) -> envExtend (args ++ [var]) st2
                 (Nothing) -> envExtend args st2
-            rec = compileScope expr st3
-            instrs1 = [Jump clbl, Label flbl]
-            instrs2 = [Return, Label clbl,
-                Push (TFunc flbl (fromIntegral (length args) :: Word8)
-                    (v /= Nothing))]
-        in continue rec
-            -- When returning the new compiler state, be careful to just
-            -- return the new label counter, and the old environment
-            (\(_, pc) -> Pass [] (e, pc))
-            (\instrs _ -> instrs1 ++ instrs ++ instrs2)
+        start <- Pass [Jump clbl, Label flbl] st3
+        mid   <- compileScope expr start
+        let end = Pass [Return, Label clbl,
+                    Push (TFunc flbl (fromIntegral (length args) :: Word8)
+                    (v /= Nothing))] mid
+        -- When returning the new compiler state, be careful to just
+        -- return the new label counter, and the old environment
+        end >>= \(_, pc) -> return (e, pc)
 

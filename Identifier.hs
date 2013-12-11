@@ -9,6 +9,7 @@ import Compiler
 import Data.Word
 import Error
 import Lexer
+import Result
 
 -- An identifier, such as "var"
 

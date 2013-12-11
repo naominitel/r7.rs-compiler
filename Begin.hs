@@ -7,6 +7,7 @@ import AST
 import Bytecode
 import Compiler
 import Lexer
+import Result
 
 data Begin = Begin [Expression]
 
@@ -19,8 +20,7 @@ instance Expand Begin where
 
 instance CompileExpr Begin where
     codegen (Begin ((Expr a) : [])) st p = codegen a st p
-    codegen (Begin ((Expr a) : rest)) (e, l) pos =
-        let ret = codegen a (e, l) False in
-        continue ret
-            (\st -> codegen (Begin rest) st pos)
-            (\iret ir -> iret ++ [(Pop)] ++ ir)
+    codegen (Begin ((Expr a) : rest)) (e, l) pos = do
+        ret <- codegen a (e, l) False
+        ret <- Pass [Pop] ret
+        codegen (Begin rest) ret pos

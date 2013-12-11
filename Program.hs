@@ -19,6 +19,7 @@ import Define
 import Error
 import Imports
 import Library
+import Result
 
 data CmdOrDef = Cmd Expression | Def Define
 data Program = Program [Imports] [CmdOrDef]
@@ -61,29 +62,24 @@ getCommands (Cmd c : r) = c : (getCommands r)
 -- cause a runtime error, whereas in the case of a scope body, it is a parse
 -- error
 
-compileBody :: [CmdOrDef] -> Word64 -> State -> Result
-compileBody [] _ st = Pass [] st
-compileBody (Cmd (Expr a) : r) i st =
-    let rec = codegen a st False in
-    continue rec
-        (compileBody r i)
-        (\irec ir -> irec ++ [(Pop)] ++ ir)
-compileBody (Def (Define var (Expr e) _) : r) i st =
-    let rec = codegen e st False in
-    continue rec
-        (compileBody r $ i + 1)
-        (\irec ir -> irec ++ [(Store i)] ++ ir)
+compileBody :: [CmdOrDef] -> Word64 -> State -> Compiler.Result
+compileBody [] _ st = return st
+compileBody (Cmd (Expr a) : r) i st = do
+    cmd <- codegen a st False
+    cmd <- Pass [Pop] cmd
+    compileBody r i cmd
+compileBody (Def (Define var (Expr e) _) : r) i st = do
+    def <- codegen e st False
+    def <- Pass [Store i] def
+    compileBody r (i + 1) def
 
-compileProgram :: Program -> Result
+compileProgram :: Program -> Compiler.Result
 compileProgram (Program _ defs) =
     let defines = (getDefines defs)
         envsize = fromIntegral (length defines) :: Word64
         env = map (\(Define var _ _) -> var) defines
         initst = envExtend env initialState
-        rec = compileBody defs 0 initst
-    in continue rec
-        (\st -> Pass [] st)
-        (\irec _ -> [Alloc envsize] ++ irec)
+    in Pass [Alloc envsize] initst >>= compileBody defs 0
 
 instance Show CmdOrDef where
     show (Cmd c) = show c

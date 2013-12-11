@@ -1,11 +1,10 @@
 module Compiler
 (
     CompileExpr(codegen),
+    Compiler.Result,
     Env,
     Expression(Expr),
-    Result(Failure, Pass),
     State,
-    continue,
     envExtend,
     envFetch,
     initialState,
@@ -17,6 +16,7 @@ import Data.Word
 import AST
 import Bytecode
 import Error
+import Result
 
 -- This module contains various definition for code generation
 
@@ -67,28 +67,14 @@ envExtend e1 (e2, lbl) = (e1:e2, lbl)
 --   * The next available label
 --   * If the current expression is in last-call-position
 
-data Result = Failure [Error] State | Pass [Instr] State
-
-continue :: Result -> (State -> Result) -> ([Instr] -> [Instr] -> [Instr]) -> Result
-continue ret next gen =
-    case ret of
-        Failure errs st ->
-            let cont = next st in
-            case cont of
-                Failure e s -> Failure (errs ++ e) s
-                Pass _ s -> Failure errs s
-        Pass instrs st ->
-            let cont = next st in
-            case cont of
-                Failure errs s -> cont
-                Pass i s -> Pass (gen instrs i) s
+type Result = Result.Result [Error] [Instr] State
 
 -- Wrapper type around expression types to be used by compiler functions
 
 data Expression = forall a. CompileExpr a => Expr a
 
 class (Expand a) => CompileExpr a where
-    codegen :: a -> State -> Bool -> Result
+    codegen :: a -> State -> Bool -> Compiler.Result
 
 instance Show Expression where
     show (Expr e) = show e

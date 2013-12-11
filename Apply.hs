@@ -9,6 +9,7 @@ import Bytecode
 import Compiler
 import Data.Word
 import Lexer
+import Result
 
 -- a function call (f arg)
 
@@ -21,11 +22,10 @@ instance Show Apply where
  
  -- compile the expressions passed as arguments
 
-compileArgs :: [Expression] -> State -> Result
-compileArgs [] st = Pass [] st
+compileArgs :: [Expression] -> State -> Compiler.Result
+compileArgs [] st = return st
 compileArgs ((Expr a) : rest) st =
-    let exp1 = codegen a st False in
-    continue exp1 (\st1 -> compileArgs rest st1) (++)
+    codegen a st False >>= compileArgs rest
 
 -- Assembly generation for function application
 -- (f a b c) is compiled the following way :
@@ -39,10 +39,9 @@ instance Expand Apply where
     expand ctx (Apply f args) = Apply (expand ctx f) (map (expand ctx) args)
 
 instance CompileExpr Apply where
-    codegen (Apply (Expr f) parms) st pos =
-        let args = compileArgs (reverse parms) st in
-        continue args
-            (\st -> codegen f st False)
-            (\a f -> a ++ f ++ if pos
+    codegen (Apply (Expr f) parms) st pos = do
+        args <- compileArgs (reverse parms) st
+        fun  <- codegen f args False
+        Pass (if pos
                 then [TCall (fromIntegral (length parms) :: Word8)]
-                else [Call (fromIntegral (length parms) :: Word8)])
+                else [Call (fromIntegral (length parms) :: Word8)]) fun

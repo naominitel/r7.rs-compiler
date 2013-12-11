@@ -9,6 +9,7 @@ import AST
 import Bytecode
 import Compiler
 import Lexer
+import Result
 
 -- This module handles literal constants
 

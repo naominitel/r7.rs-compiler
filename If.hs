@@ -7,6 +7,7 @@ import AST
 import Bytecode
 import Compiler
 import Lexer
+import Result
 
 -- a conditional branching (if expr_true expr_false)
 
@@ -19,15 +20,12 @@ instance Expand If where
     expand c (If ec et ef p) = If (expand c ec) (expand c et) (expand c ef) p
  
 instance CompileExpr If where
-    codegen (If (Expr ec) (Expr et) (Expr ef) _) st p =
+    codegen (If (Expr ec) (Expr et) (Expr ef) _) st p = do
         let (onfalse, st1) = nextLabel st
-            (contlbl, st2) = nextLabel st1
-            cond = codegen ec st2 False
-        in continue cond
-            (\st ->
-                let e1 = codegen et st p
-                in continue e1
-                    (\st -> codegen ef st p)
-                    (\t f -> t ++ [(Jump contlbl)] ++ [(Label onfalse)]
-                          ++ f ++ [(Label contlbl)]))
-            (\cond e -> cond ++ [(Branch onfalse)] ++ e)
+        let (contlbl, st2) = nextLabel st1
+        cond <- codegen ec st2 False
+        lbl  <- Pass [Branch onfalse] cond
+        e1   <- codegen et lbl p
+        flse <- Pass [Jump contlbl, Label onfalse] e1
+        e2   <- codegen ef e1 p
+        Pass [Label contlbl] e2

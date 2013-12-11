@@ -14,6 +14,7 @@ import Imports
 import Lexer
 import Library
 import Program
+import Result
 
 data Module = Prog Program | Lib Library
 

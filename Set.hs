@@ -9,6 +9,7 @@ import Compiler
 import Data.Word
 import Error
 import Lexer
+import Result
 
 data Set = Set String Expression Pos
 
@@ -22,10 +23,7 @@ instance CompileExpr Set where
     codegen (Set i (Expr expr) p) st@(env, lbl) _ =
         case envFetch i env of
             Just envId ->
-                let rec = codegen expr st False in
-                continue rec
-                    (\st -> Pass [] st)
-                    (\i _ -> i ++ [Store (fromIntegral envId :: Word64)]
-                        ++ [Push TUnit])
+                codegen expr st False >>=
+                Pass [Store (fromIntegral envId :: Word64), Push TUnit]
             Nothing ->
                 Failure [Error ("Unbound variable " ++ i) p] st

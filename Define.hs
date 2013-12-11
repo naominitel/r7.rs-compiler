@@ -7,13 +7,15 @@ module Define
     scopeAddExpr
 ) where
 
+import Data.Word
+
 import AST
 import Begin
 import Bytecode
 import Compiler
 import Error
 import Lexer
-import Data.Word
+import Result
 
 -- an identifier definition (define id val)  
 
@@ -36,23 +38,21 @@ scopeAddExpr (Scope l (Begin e)) expr = Scope l $ Begin (expr:e)
 instance Show Scope where
     show (Scope defs expr) = "a scope with defines " ++ show defs ++ "/" ++ show expr
 
-compileDefines :: [Define] -> Word64 -> State -> Result
-compileDefines [] _ st = Pass [] st
-compileDefines ((Define var (Expr e) _) : r) i st =
-    let rec = codegen e st False in
-    continue rec
-            (compileDefines r $ i + 1)
-            (\irec ir -> irec ++ [(Store i)] ++ ir)
+compileDefines :: [Define] -> Word64 -> State -> Compiler.Result
+compileDefines [] _ st = return st
+compileDefines ((Define var (Expr e) _) : r) i st = do
+    rec <- codegen e st False
+    rec <- Pass [Store i] rec
+    compileDefines r (i + 1) rec
 
 instance Expand Scope where
     expand c (Scope defs body) = Scope (map (expand c) defs) (expand c body)
 
-compileScope :: Scope -> State -> Result
-compileScope (Scope defs body) st =
+compileScope :: Scope -> State -> Compiler.Result
+compileScope (Scope defs body) st = do
     let envsize = fromIntegral (length defs) :: Word64
-        env = map (\(Define var _ _) -> var) defs
-        st1 = envExtend env st
-        rec = compileDefines defs 0 st1
-    in continue rec
-        (\st -> codegen body st True)
-        (\idefs ibody -> [Alloc envsize] ++ idefs ++ ibody)
+    let env = map (\(Define var _ _) -> var) defs
+    let st1 = envExtend env st
+    alloc <- Pass [Alloc envsize] st1
+    defs  <- compileDefines defs 0 alloc
+    codegen body defs True
