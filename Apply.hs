@@ -40,7 +40,7 @@ instance Expand Apply where
 
 instance CompileExpr Apply where
     codegen (Apply (Expr f) parms) st pos = do
-        args <- compileArgs (reverse parms) st
+        args <- compileArgs parms st
         fun  <- codegen f args False
         Pass (if pos
                 then [TCall (fromIntegral (length parms) :: Word8)]
