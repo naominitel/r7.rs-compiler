@@ -8,7 +8,7 @@ import Data.Word
 import AST
 import Bytecode
 import Compiler
-import Lexer
+import Error
 import Result
 
 -- This module handles literal constants

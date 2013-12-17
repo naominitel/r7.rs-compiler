@@ -6,7 +6,7 @@ module If
 import AST
 import Bytecode
 import Compiler
-import Lexer
+import Error
 import Result
 
 -- a conditional branching (if expr_true expr_false)

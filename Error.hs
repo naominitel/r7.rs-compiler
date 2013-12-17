@@ -1,6 +1,7 @@
 module Error
 (
     Error(Error),
+    Pos(Pos),
     reportErrors,
     reportError,
 ) where
@@ -8,7 +9,11 @@ module Error
 import System.Console.ANSI
 import System.IO
 
-import Lexer
+-- Pos: position of a token in the file (Line, Column, Filename)
+data Pos = Pos Int Int String
+
+instance Show Pos where
+    show (Pos l c f) = f ++ ":" ++ (show l) ++ ":" ++ (show c) ++ ""
 
 -- Error <reason> <where>
 data Error = Error String Pos

@@ -1,6 +1,5 @@
 module Lexer 
 ( 
-    Pos(Pos),
 
     Token
     (
@@ -35,12 +34,10 @@ module Lexer
 import Data.Word
 import Text.Regex.Posix
 
--- Pos: position of a token in the file (Line, Column, Filename)
+import Error
+import Result
 
-data Pos = Pos Int Int String
-
-instance Show Pos where
-    show (Pos l c f) = f ++ ":" ++ (show l) ++ ":" ++ (show c) ++ ""
+type LexResult = Result [Error] [Token] ()
 
 -- Token: basic data structure for a program lexical unit.
 --  * Open is an opening brace '('
@@ -162,7 +159,7 @@ string = "\"(\\.|[^\\\\\"])*\""
 
 -- Tokenize: core of the lexer, transforms the program into a token list
 
-tokenize :: (String, Pos) -> Either String Token
+tokenize :: (String, Pos) -> Either Error Token
 
 -- Special tokens
 
@@ -194,20 +191,45 @@ tokenize (s, p)
     | s =~ integer             = Right $ TokInt (read s :: Word64) p
     | s =~ string              = Right $ TokStr (read s :: String) p
     | s =~ identifier          = Right $ TokId s p
-    | otherwise                = Left $ "Unknown token " ++ s ++ " at " ++ show p
+    | otherwise                = Left  $ Error ("Unknown token " ++ s) p
      
 -- Check if the pairs of parenthesis are correct
 
-syntaxChecker :: [Token] -> Int -> Either String [Token]
-syntaxChecker [] 0                = Right []
-syntaxChecker [] _                = Left "Unclosed parenthesis at end of input"
-syntaxChecker (t@(TokOpen _):r) c = syntaxChecker r (c + 1) >>= Right . (:) t
-syntaxChecker (t@(TokClose p):r) c
-    | (c > 0)                     = syntaxChecker r (c - 1) >>= Right . (:) t
-    | otherwise                   = Left $ "Unexpected ')' at " ++ show p
-syntaxChecker (t:r) count         = syntaxChecker r count >>= Right . (:) t
+syntaxChecker :: [Token] -> Pos -> Int -> Maybe [Error]
+
+syntaxChecker [] _ 0 = Nothing
+
+syntaxChecker [] p _ =
+    Just [Error "Unclosed parenthesis at end of input" p]
+
+syntaxChecker (t@(TokOpen p):r) _ c =
+    syntaxChecker r p (c + 1)
+
+syntaxChecker (t@(TokClose p):r) lp c
+    | (c > 0) = syntaxChecker r lp (c - 1)
+    | otherwise = Just [Error "Unexpected ')'" p]
+
+syntaxChecker (t:r) p count = syntaxChecker r p count
 
 -- entry point for the lexer
 
-lexer :: Program -> Either String [Token]
-lexer prog = mapM tokenize $ cut prog
+tokenizeList :: [(String, Pos)] -> Either [Error] [Token]
+tokenizeList [] = Right []
+tokenizeList (h:t) =
+    case tokenize h of
+        Right tok ->
+            case tokenizeList t of
+                Right toks -> Right $ tok : toks
+                Left errs -> Left errs
+        Left err ->
+            case tokenizeList t of
+                Right toks -> Left [err]
+                Left errs -> Left $ err : errs
+
+lexer :: Program -> Either [Error] [Token]
+lexer prog =
+    let toks = cut prog in
+    tokenizeList toks >>= \t ->
+        case syntaxChecker t (Pos 0 0 "") 0 of
+            Nothing -> Right t
+            Just errs -> Left errs

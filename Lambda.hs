@@ -7,7 +7,7 @@ import AST
 import Bytecode
 import Compiler
 import Define
-import Lexer
+import Error
 import Identifier
 import Data.Word
 import Result

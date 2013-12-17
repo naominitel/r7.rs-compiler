@@ -95,7 +95,7 @@ main = do
                 let prog = program contents fp
 
                 -- check syntax
-                case lexer prog >>= \t -> syntaxChecker t 0 of
+                case lexer prog of
 
                     -- run parser
                     Right toks -> case parser toks of
@@ -120,5 +120,5 @@ main = do
                                 hClose outf
 
                     -- syntax verification failed
-                    Left err -> putStrLn $ "Syntax error: " ++ err
+                    Left errs -> reportErrors errs
 
