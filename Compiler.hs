@@ -16,6 +16,7 @@ import Data.Word
 import AST
 import Bytecode
 import Error
+import Primitives
 import Result
 
 -- This module contains various definition for code generation
@@ -27,14 +28,6 @@ type State = ([Env], Word32)
 
 initialState :: State
 initialState = ([primEnv], 0)
-
--- Global environment for containing primitives
-
-primEnv :: [String]
-primEnv = ["+", "-", "*", "/", "=", "eq?", "equal?", "boolean?", "null?",
-           "pair?", "procedure?", "symbol?", "number?", "cons", "car", "cdr",
-           "set-car!", "set-cdr!", "list", "list?", "map", "filter", "display",
-           "newline", "exit", "assert"]
 
 -- utility function used by primFetch or envFetch to return the index of an item
 
