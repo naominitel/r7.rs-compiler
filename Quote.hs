@@ -4,12 +4,9 @@ module Quote
 ) where
 
 import AST
-import Bytecode
 import Compiler
 import Datum
 import Error
-import Lexer
-import Tree
 
 -- A quoted expression (quote expr)
 
@@ -22,8 +19,7 @@ instance Show Quote where
     show (Quote s _) = show s
 
 instance Expand Quote where
-    expand ctx quote = quote
- 
+    expand _ quote = quote
+
 instance CompileExpr Quote where
     codegen (Quote dat _) st _ = compileDatum dat st
-    

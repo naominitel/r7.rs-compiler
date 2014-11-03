@@ -14,10 +14,9 @@ import Begin
 import Bytecode
 import Compiler
 import Error
-import Lexer
 import Result
 
--- an identifier definition (define id val)  
+-- an identifier definition (define id val)
 
 data Define = Define String Expression Pos
 
@@ -26,7 +25,7 @@ instance Show Define where
 
 instance Expand Define where
     expand ctxt (Define var e p) = Define var (expand ctxt e) p
- 
+
 data Scope = Scope [Define] Begin
 
 scopeAddDef :: Scope -> Define -> Scope
@@ -40,7 +39,7 @@ instance Show Scope where
 
 compileDefines :: [Define] -> Word64 -> State -> Compiler.Result
 compileDefines [] _ st = return st
-compileDefines ((Define var (Expr e) _) : r) i st = do
+compileDefines ((Define _ (Expr e) _) : r) i st = do
     rec <- codegen e st False
     rec <- Pass [Store i] rec
     compileDefines r (i + 1) rec

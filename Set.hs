@@ -8,7 +8,6 @@ import Bytecode
 import Compiler
 import Data.Word
 import Error
-import Lexer
 import Result
 
 data Set = Set String Expression Pos
@@ -20,7 +19,7 @@ instance Expand Set where
     expand ctxt (Set s e p) = Set s (expand ctxt e) p
 
 instance CompileExpr Set where
-    codegen (Set i (Expr expr) p) st@(env, lbl) _ =
+    codegen (Set i (Expr expr) p) st@(env, _) _ =
         case envFetch i env of
             Just envId ->
                 codegen expr st False >>=

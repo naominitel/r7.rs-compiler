@@ -1,18 +1,30 @@
 Name:           scmc
 Version:        0.1
+Description:    Simple Scheme-like langage compiler
 Author:         Naomi Nitel
 Maintainer:     naominitel@gmail.com
+Copyright:      © 2013-2014 Naomi Nitel
 Build-type:     Simple
-Cabal-version:  >= 1.2
+Category:       Development
+homepage:       https://github.com/naominitel/r7.rs-compiler
+bug-reports:    https://github.com/naominitel/r7.rs-compiler/issues
+Cabal-version:  >= 1.15
+
+
+source-repository head
+    type:git
+    location: https://github.com/naominitel/r7.rs-compiler
 
 Executable scmc
-  Main-is: Main.hs
-  Extensions: ExistentialQuantification
+    Main-is: Main.hs
+    ghc-options: -Wall -W -fwarn-incomplete-patterns -fwarn-tabs
+        -fwarn-overlapping-patterns -fwarn-incomplete-record-updates
+        -fwarn-monomorphism-restriction -fwarn-unused-do-bind
 
-  Build-depends: 
-    ansi-terminal,
-    base,
-    binary,
-    bytestring,
-    containers,
-    regex-posix
+    Build-depends:
+        ansi-terminal -any,
+        base >= 4 && < 6,
+        binary -any,
+        bytestring -any,
+        containers -any,
+        regex-posix -any

@@ -8,7 +8,6 @@ import Bytecode
 import Compiler
 import Data.Word
 import Error
-import Lexer
 import Result
 
 -- An identifier, such as "var"
@@ -21,12 +20,12 @@ instance Show Identifier where
 -- Assembly code generation for accessing to a variable
 
 instance Expand Identifier where
-    expand ctxt i = i
- 
+    expand _ i = i
+
 instance CompileExpr Identifier where
     codegen (Identifier var p) st@(env, lbl) _ =
-        case envFetch var env of 
-            (Just envId) -> 
+        case envFetch var env of
+            (Just envId) ->
                 Pass [Fetch (fromIntegral envId :: Word64)] st
-            (Nothing) -> 
+            (Nothing) ->
                 Failure [Error ("Unbound variable " ++ var) p] st

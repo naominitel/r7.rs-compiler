@@ -1,4 +1,4 @@
-module Syntax 
+module Syntax
 (
     LetArgs,
     letArgs,
@@ -9,6 +9,7 @@ module Syntax
 
 -- Module for basic operations on the primary tree defined in the Tree module
 
+import Control.Monad(liftM)
 import Error
 import Lexer
 import Tree
@@ -18,27 +19,27 @@ import Tree
 
 type LetArgs = [(Token, TokenTree)]
 
--- extracts the list of a let form formal args 
+-- extracts the list of a let form formal args
 -- e.g. ((e1 v1) (e2 v2)) -> [(e1, v1), (e2, v2)]
 
 letArgs :: [TokenTree] -> Either Error LetArgs
-letArgs []                                              = return []
-letArgs (TokNode (TokLeaf t@(TokId _ _):val:[]) : rest) = letArgs rest >>= return . (:) (t, val)
-letArgs _                                               = fail "Malformed let parameter list"
+letArgs []                                            = return []
+letArgs (TokNode [TokLeaf t@(TokId _ _), val] : rest) = liftM ((:) (t, val)) (letArgs rest)
+letArgs _                                             = fail "Malformed let parameter list"
 
--- return the list of identifiers of the formal let args 
+-- return the list of identifiers of the formal let args
 -- e.g. [e1, e2, ..., en]
 
 letArgsIdentifiers :: LetArgs -> Either Error [Token]
 letArgsIdentifiers [] = return []
-letArgsIdentifiers ((i, tree) : r) = letArgsIdentifiers r >>= return . (:) i
+letArgsIdentifiers ((i, _) : r) = liftM ((:) i) (letArgsIdentifiers r)
 
 -- return the list of expressions of the formal let args
 -- e.g. [v1, v2, ..., vn]
 
 letArgsValues :: LetArgs -> Either Error [TokenTree]
 letArgsValues [] = return []
-letArgsValues ((i, tree) : r) = letArgsValues r >>= return . (:) tree
+letArgsValues ((_, tree) : r) = liftM ((:) tree) (letArgsValues r)
 
 -- return the list of arguments of a lambda-expr
 -- e.g. [a, b, c]
@@ -47,8 +48,7 @@ letArgsValues ((i, tree) : r) = letArgsValues r >>= return . (:) tree
 
 lambdaArgs :: [TokenTree] -> Either Error ([String], Maybe String)
 lambdaArgs [] = return ([], Nothing)
-lambdaArgs (TokLeaf (TokId arg _) : r) = (lambdaArgs r) >>= \(a, v) ->
-            return $ (arg : a, v)
-lambdaArgs (TokLeaf (TokDot _) : (TokLeaf (TokId var _)) : []) =
-            return ([], (Just var))
-lambdaArgs a = fail "Malformed lambda parameter list"
+lambdaArgs (TokLeaf (TokId arg _) : r) =
+    lambdaArgs r >>= \(a, v) -> return (arg : a, v)
+lambdaArgs (TokLeaf (TokDot _) : [TokLeaf (TokId var _)]) = return ([], Just var)
+lambdaArgs _ = fail "Malformed lambda parameter list"

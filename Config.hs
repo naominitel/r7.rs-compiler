@@ -3,9 +3,9 @@ module Config
     Config,
     ConfigKey
     (
-        AssembleOnly, 
-        OutFile, 
-        InFile, 
+        AssembleOnly,
+        OutFile,
+        InFile,
         LogVerbose
     ),
     Config.lookup,
@@ -17,6 +17,7 @@ module Config
 ) where
 
 import Data.Map
+import Data.Maybe
 
 -- Configuration is stored in an hashmap whose keys are all here :
 
@@ -57,9 +58,7 @@ lookup cnf key = case Data.Map.lookup key cnf of
     Nothing -> False
 
 lookupDefault :: Config -> ConfigKey -> ConfigValue -> ConfigValue
-lookupDefault cnf key def = case Data.Map.lookup key cnf of
-    Just val -> val
-    Nothing -> def
+lookupDefault cnf key def = fromMaybe def (Data.Map.lookup key cnf)
 
 lookupStr :: Config -> ConfigKey -> Maybe String
 lookupStr cnf key = case Data.Map.lookup key cnf of
@@ -67,17 +66,15 @@ lookupStr cnf key = case Data.Map.lookup key cnf of
     _ -> Nothing
 
 lookupDefaultStr :: Config -> ConfigKey -> String -> String
-lookupDefaultStr cnf key def = case lookupStr cnf key of
-    Just str -> str
-    Nothing -> def
+lookupDefaultStr cnf key def = fromMaybe def (lookupStr cnf key)
 
 -- Set an option in the map (boolean)
 
 set :: ConfigKey -> Config -> Config
-set key cnf = insert key (ConfigEmpty) cnf 
+set key = insert key ConfigEmpty
 
 unset :: ConfigKey -> Config -> Config
-unset key cnf = delete key cnf
+unset = delete
 
 setStr :: ConfigKey -> String -> Config -> Config
-setStr key val cnf = insert key (ConfigString val) cnf
+setStr key val = insert key (ConfigString val)

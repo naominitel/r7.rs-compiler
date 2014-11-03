@@ -1,20 +1,16 @@
 -- parser.hs
 -- Copyright (c) Naomi Nitel <naominitel@gmail.com>
 
-module Parser 
-( 
-    arborize, 
+module Parser
+(
+    arborize,
     parseExpr,
     parser
 ) where
 
-import Control.Applicative
-import Control.Monad.Instances
 
 import Apply
-import AST
 import Begin
-import Bytecode
 import Compiler
 import Constant
 import Datum
@@ -43,7 +39,7 @@ arborize [] = ([], [])
 
 arborize (TokClose _:s) = ([], s)
 
-arborize (TokOpen _:s) = 
+arborize (TokOpen _:s) =
     let (rec, cont) = arborize s
         (next, end) = arborize cont
     in (TokNode rec : next, end)
@@ -72,7 +68,7 @@ parseExpr (TokNode (TokLeaf (TokLet p) : (TokNode bindings) : expr : [])) = do
     args <- letArgs bindings
     ids <- letArgsIdentifiers args
     vals <- letArgsValues args
-    let lambda = TokNode $ 
+    let lambda = TokNode $
             TokLeaf (TokLambda p) : (TokNode $ map TokLeaf ids) : expr : []
     parseExpr $ TokNode (lambda : vals)
 
@@ -118,7 +114,7 @@ parseExpr (TokNode (TokLeaf (TokQuote p) : _)) =
 
 -- Parsing for (begin expr)
 
-parseExpr (TokNode (TokLeaf (TokBegin p) : exprs)) = do
+parseExpr (TokNode (TokLeaf (TokBegin _) : exprs)) = do
     parsedExprs <- mapM parseExpr exprs
     Right $ Expr $ Begin parsedExprs
 
@@ -142,8 +138,8 @@ parseExpr (TokLeaf t) =
 
 parseLibname :: [TokenTree] -> Either Error LibName
 parseLibname [] = Right []
-parseLibname (TokLeaf (TokId s p) : []) = Right $ [s]
-parseLibname (TokLeaf (TokId s p) : r) = parseLibname r >>= Right . (:) s
+parseLibname (TokLeaf (TokId s _) : []) = Right $ [s]
+parseLibname (TokLeaf (TokId s _) : r) = parseLibname r >>= Right . (:) s
 parseLibname (TokLeaf t : _) = Left $ Error
     ("unexpected token in library name: " ++ show t) (tokPos t)
 parseLibname (TokNode (TokLeaf t : _) : _) = Left $ Error
@@ -201,8 +197,7 @@ parseImportSet :: [TokenTree] -> Either Error Imports
 
 parseImportSet [] = Right $ []
 
-parseImportSet (TokNode t : []) =
-    parseImp t >>= \t -> Right $ [t]
+parseImportSet (TokNode t : []) = parseImp t >>= \t -> Right [t]
 
 parseImportSet (TokNode h : t) = do
     rec <- parseImportSet t
@@ -245,7 +240,7 @@ parseIdentList _ = fail $ "malformed identifier list"
 
 parseImp :: [TokenTree] -> Either Error Import
 
-parseImp (TokLeaf (TokOnly p) : (TokNode imp) : ids) = do
+parseImp (TokLeaf (TokOnly _) : (TokNode imp) : ids) = do
     i <- parseIdentList ids
     n <- parseImp imp
     Right $ Only n i
@@ -253,7 +248,7 @@ parseImp (TokLeaf (TokOnly p) : (TokNode imp) : ids) = do
 parseImp (TokLeaf (TokOnly p) : _) =
     Left $ Error "malformed only expression" p
 
-parseImp (TokLeaf (TokExcept p) : (TokNode imp) : ids) = do
+parseImp (TokLeaf (TokExcept _) : (TokNode imp) : ids) = do
     i <- parseIdentList ids
     n <- parseImp imp
     Right $ Except n i
@@ -261,7 +256,7 @@ parseImp (TokLeaf (TokExcept p) : (TokNode imp) : ids) = do
 parseImp (TokLeaf (TokExcept p) : _) =
     Left $ Error "malformed except expression" p
 
-parseImp (TokLeaf (TokPrefix p) : (TokNode imp) : ids) = do
+parseImp (TokLeaf (TokPrefix _) : (TokNode imp) : ids) = do
     i <- parseIdentList ids
     n <- parseImp imp
     Right $ Prefix n i
@@ -269,7 +264,7 @@ parseImp (TokLeaf (TokPrefix p) : (TokNode imp) : ids) = do
 parseImp (TokLeaf (TokPrefix p) : _) =
     Left $ Error "malformed except expression" p
 
-parseImp (TokLeaf (TokRename p) : (TokNode imp) : rns) =
+parseImp (TokLeaf (TokRename _) : (TokNode imp) : rns) =
     let parseRenames l = case l of
             [] -> fail $ "Empty rename list"
             TokNode(TokLeaf (TokId i p1) : TokLeaf (TokId n p2) : []) : [] ->
@@ -305,7 +300,7 @@ parseProgramBody [] = fail $ "Empty program"
 parseProgramBody (TokNode (TokLeaf (TokImport p) : _) : []) = Left $
     Error "no program after an import sequence" p
 
-parseProgramBody (i@(TokNode (TokLeaf (TokImport _) : s)) : r) = do
+parseProgramBody (i@(TokNode (TokLeaf (TokImport _) : _)) : r) = do
     set <- parseImports i
     prog <- parseProgramBody r
     Right $ progAddImp prog set
@@ -314,13 +309,13 @@ parseProgramBody (_ : TokNode (TokLeaf (TokImport p) : _) : _) = Left $
     Error "expected command or definition, but found (import ... )" p
 
 parseProgramBody (def : []) = case def of
-    TokNode (TokLeaf (TokDefine p) : d) ->
+    TokNode (TokLeaf (TokDefine _) : d) ->
         parseDefine d >>= \d -> Right $ Program [] [Def d]
     expr ->
         parseExpr expr >>= \e -> Right $ Program [] [Cmd e]
 
 parseProgramBody (def : r) = case def of
-    TokNode (TokLeaf (TokDefine p) : d) -> do
+    TokNode (TokLeaf (TokDefine _) : d) -> do
         def <- parseDefine d
         prog <- parseProgramBody r
         Right $ progAddDef prog def
@@ -377,7 +372,7 @@ parseProgramOrLibrary :: [TokenTree] -> Either Error Module
 
 parseProgramOrLibrary [] = fail $ "Empty program"
 
-parseProgramOrLibrary (i@(TokNode (TokLeaf (TokImport _) : s)) : r) = do
+parseProgramOrLibrary (i@(TokNode (TokLeaf (TokImport _) : _)) : r) = do
     set <- parseImports i
     prog <- parseProgramBody r
     Right $ Prog $ progAddImp prog set
@@ -390,7 +385,7 @@ parseProgramOrLibrary t =
 
 parser :: [Token] -> Either Error Module
 
-parser tokens = 
+parser tokens =
     case arborize tokens of
         (exprs, []) -> parseProgramOrLibrary exprs
         (_, _) -> fail "Parse error: extra tokens after parenthesis"

@@ -12,13 +12,10 @@ module Program
 import Data.Word
 
 import AST
-import Begin
 import Bytecode
 import Compiler
 import Define
-import Error
 import Imports
-import Library
 import Result
 
 data CmdOrDef = Cmd Expression | Def Define
@@ -26,14 +23,13 @@ data Program = Program [Imports] [CmdOrDef]
 
 importedLibs :: Program -> [LibName]
 importedLibs (Program imps _) =
-    let aux = \imp ->
-            case imp of
-                Only i _ -> aux i
-                Except i _ -> aux i
-                Prefix i _ -> aux i
-                Rename i _ -> aux i
-                Lib lname -> [lname]
-    in concat $ map aux $ concat imps
+    let aux imp = case imp of
+            Only i _   -> aux i
+            Except i _ -> aux i
+            Prefix i _ -> aux i
+            Rename i _ -> aux i
+            Lib lname  -> [lname]
+    in concatMap aux (concat imps)
 
 progAddDef :: Program -> Define -> Program
 progAddDef (Program i defs) d = Program i (Def d : defs)
@@ -46,13 +42,13 @@ progAddImp (Program imps d) i = Program (i : imps) d
 
 getDefines :: [CmdOrDef] -> [Define]
 getDefines [] = []
-getDefines (Def d : r) = d : (getDefines r)
-getDefines (Cmd c : r) = getDefines r
+getDefines (Def d : r) = d : getDefines r
+getDefines (Cmd _ : r) = getDefines r
 
 getCommands :: [CmdOrDef] -> [Expression]
 getCommands [] = []
-getCommands (Def d : r) = getCommands r
-getCommands (Cmd c : r) = c : (getCommands r)
+getCommands (Def _ : r) = getCommands r
+getCommands (Cmd c : r) = c : getCommands r
 
 -- The compilation of a program body is similar to the compilation of a scope
 -- body, except that defines and commands may be interleaved. We first allocate
@@ -68,17 +64,17 @@ compileBody (Cmd (Expr a) : r) i st = do
     cmd <- codegen a st False
     cmd <- Pass [Pop] cmd
     compileBody r i cmd
-compileBody (Def (Define var (Expr e) _) : r) i st = do
+compileBody (Def (Define _ (Expr e) _) : r) i st = do
     def <- codegen e st False
     def <- Pass [Store i] def
     compileBody r (i + 1) def
 
 compileProgram :: Program -> Compiler.Result
 compileProgram (Program _ defs) =
-    let defines = (getDefines defs)
+    let defines = getDefines defs
         envsize = fromIntegral (length defines) :: Word64
-        env = map (\(Define var _ _) -> var) defines
-        initst = envExtend env initialState
+        env     = map (\(Define var _ _) -> var) defines
+        initst  = envExtend env initialState
     in Pass [Alloc envsize] initst >>= compileBody defs 0
 
 instance Show CmdOrDef where
@@ -90,7 +86,7 @@ instance Expand CmdOrDef where
     expand ctx (Cmd c) = Cmd $ expand ctx c
 
 instance Show Program where
-    show (Program i cmds) = (show cmds)
+    show (Program _ cmds) = show cmds
 
 instance Expand Program where
     expand ctx (Program i cmds) = Program i $ map (expand ctx) cmds

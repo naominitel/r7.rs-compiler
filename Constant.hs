@@ -13,7 +13,7 @@ import Result
 
 -- This module handles literal constants
 
-data Constant 
+data Constant
     = IntConstant Word64 Pos
     | BoolConstant Bool Pos
     | Symbol String Pos
@@ -24,8 +24,8 @@ instance Show Constant where
     show (Symbol s _)       = show s
 
 instance Expand Constant where
-    expand ctx c = c
- 
+    expand _ c = c
+
 instance CompileExpr Constant where
     codegen (IntConstant i _) st _  = Pass [Push $ TInt i] st
     codegen (BoolConstant b _) st _ = Pass [Push $ TBool b] st

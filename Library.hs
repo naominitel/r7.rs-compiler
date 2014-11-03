@@ -32,7 +32,7 @@ instance Expand CmdOrDef where
     expand ctx (Def d) = Def $ expand ctx d
 
 instance Show Library where
-    show (Library n i a) = "(define-library " ++ show n ++ " " ++ show a
+    show (Library n _ a) = "(define-library " ++ show n ++ " " ++ show a
 
 instance Expand Library where
     expand ctxt (Library n i sc) = Library n i $ map (expand ctxt) sc

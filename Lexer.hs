@@ -1,5 +1,5 @@
-module Lexer 
-( 
+module Lexer
+(
 
     Token
     (
@@ -11,9 +11,9 @@ module Lexer
         TokDot,
         TokExcept,
         TokId,
-        TokIf, 
+        TokIf,
         TokImport,
-        TokInt, 
+        TokInt,
         TokLambda,
         TokLet,
         TokOnly,
@@ -25,7 +25,7 @@ module Lexer
         TokStr
     ),
 
-    lexer, 
+    lexer,
     program,
     syntaxChecker,
     tokPos
@@ -44,7 +44,7 @@ type LexResult = Result [Error] [Token] ()
 --  * Close is a closing brace ')'
 --  * others are any other identifier or token
 
-data Token 
+data Token
     = TokBegin Pos
     | TokBool Bool Pos
     | TokClose Pos
@@ -118,20 +118,19 @@ program :: String -> String -> Program
 program str fname = (str, Pos 1 1 fname)
 
 forward :: Pos -> Pos
-forward (Pos l c f) = (Pos l (c + 1) f)
+forward (Pos l c f) = Pos l (c + 1) f
 
 newline :: Pos -> Pos
-newline (Pos l _ f) = (Pos (l + 1) 1 f)
+newline (Pos l _ f) = Pos (l + 1) 1 f
 
 -- cut: split the program into string tokens
 
 separator :: Char -> Bool
-separator c 
+separator c
     | [c] =~ "[ \t\r\n()]" = True
     | otherwise            = False
 
 cut :: Program -> [(String, Pos)]
-
 cut ([], _)         = []
 cut ('(':s, pos)    = ("(", pos) : cut (s, forward pos)
 cut (')':s, pos)    = (")", pos) : cut (s, forward pos)
@@ -139,7 +138,7 @@ cut ('\n':s, pos)   = cut (s, newline pos)
 cut ('\t':s, pos)   = cut (s, forward pos)
 cut ('\r':s, pos)   = cut (s, forward pos)
 cut (' ':s, pos)    = cut (s, forward pos)
-cut (a:[], pos)     = ([a], pos) : []
+cut ([a], pos)      = [([a], pos)]
 cut (a:c:s, pos)
     | separator c   = ([a], pos) : cut (c:s, forward pos)
     | otherwise     = let ((n,_):r) = cut (c:s, forward pos) in (a:n, pos):r
@@ -155,7 +154,6 @@ integer = "^[0-9]+$"
 
 string :: String
 string = "\"(\\.|[^\\\\\"])*\""
-
 
 -- Tokenize: core of the lexer, transforms the program into a token list
 
@@ -192,7 +190,7 @@ tokenize (s, p)
     | s =~ string              = Right $ TokStr (read s :: String) p
     | s =~ identifier          = Right $ TokId s p
     | otherwise                = Left  $ Error ("Unknown token " ++ s) p
-     
+
 -- Check if the pairs of parenthesis are correct
 
 syntaxChecker :: [Token] -> Pos -> Int -> Maybe [Error]
@@ -202,14 +200,13 @@ syntaxChecker [] _ 0 = Nothing
 syntaxChecker [] p _ =
     Just [Error "Unclosed parenthesis at end of input" p]
 
-syntaxChecker (t@(TokOpen p):r) _ c =
-    syntaxChecker r p (c + 1)
+syntaxChecker (TokOpen p : r) _ c = syntaxChecker r p (c + 1)
 
-syntaxChecker (t@(TokClose p):r) lp c
-    | (c > 0) = syntaxChecker r lp (c - 1)
+syntaxChecker (TokClose p : r) lp c
+    | c > 0 = syntaxChecker r lp (c - 1)
     | otherwise = Just [Error "Unexpected ')'" p]
 
-syntaxChecker (t:r) p count = syntaxChecker r p count
+syntaxChecker (_ : r) p count = syntaxChecker r p count
 
 -- entry point for the lexer
 
@@ -220,10 +217,10 @@ tokenizeList (h:t) =
         Right tok ->
             case tokenizeList t of
                 Right toks -> Right $ tok : toks
-                Left errs -> Left errs
+                Left errs  -> Left errs
         Left err ->
             case tokenizeList t of
-                Right toks -> Left [err]
+                Right _   -> Left [err]
                 Left errs -> Left $ err : errs
 
 lexer :: Program -> Either [Error] [Token]

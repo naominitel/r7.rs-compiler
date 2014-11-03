@@ -1,3 +1,4 @@
+{-# LANGUAGE ExistentialQuantification #-}
 module Compiler
 (
     CompileExpr(codegen),

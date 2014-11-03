@@ -2,10 +2,7 @@ import Data.Map as Map
 import System.Environment
 import System.IO
 
-import AST
-import Begin
 import Bytecode
-import Compiler
 import Config
 import Debug
 import Error
@@ -13,6 +10,7 @@ import Lexer
 import Module
 import Parser
 import Serialize
+import Control.Monad (liftM)
 
 -- default config values
 
@@ -36,45 +34,46 @@ printUsage = do
 -- parse command line arguments and store them in an HashMap
 
 parseCommandArgs :: [String] -> Either String Config
-parseCommandArgs [] = return $ Map.empty
-parseCommandArgs (arg:rest) = 
+parseCommandArgs [] = return Map.empty
+parseCommandArgs (arg:rest) =
     case arg of
         "-h" -> Left ""
         "-o" -> case rest of
-            (val:r) -> parseCommandArgs r >>= return . setStr OutFile val
-            _       -> Left $ "Missing parameter to -o"
-        "-s" -> parseCommandArgs rest >>= return . set AssembleOnly
-        "-v" -> parseCommandArgs rest >>= return . set LogVerbose
-        _    -> parseCommandArgs rest >>= return . setStr InFile arg
+            (val:r) -> liftM (setStr OutFile val) (parseCommandArgs r)
+            _       -> Left "Missing parameter to -o"
+        "-s" -> liftM (set AssembleOnly) (parseCommandArgs rest)
+        "-v" -> liftM (set LogVerbose) (parseCommandArgs rest)
+        _    -> liftM (setStr InFile arg) (parseCommandArgs rest)
 
 -- writeAssembly: write assembly program (for use with -s)
 
 writeAssembly :: [Instr] -> Handle -> IO ()
 writeAssembly [] _ = do
     putStrLn "file successfully written: "
-    return ()                            
+    return ()
 writeAssembly (i:rest) h = do
-    hPutStrLn h (show i)
+    hPrint h i
     writeAssembly rest h
 
 -- writeProgram: write ouput to file (assembly or bin, depending on config)
 
 writeProgram :: Config -> CompiledModule -> Handle -> IO ()
-writeProgram cnf = case Config.lookup cnf AssembleOnly of
-    True -> \m -> let (Mod _ _ instrs) = m in writeAssembly instrs
-    False -> Serialize.writeProgram
+writeProgram cnf =
+    if Config.lookup cnf AssembleOnly
+        then (\ m -> let (Mod _ _ instrs) = m in writeAssembly instrs)
+        else Serialize.writeProgram
 
 -- main: read command line arguments, and run compiler
 
+main :: IO ()
 main = do
-
     -- get command line arguments
     args <- getArgs
     case parseCommandArgs args of
 
         -- error in argument parsing
         Left err -> do
-            printUsage 
+            printUsage
             putStrLn err
 
         -- get input file
@@ -103,7 +102,7 @@ main = do
                         -- parsing failed
                         Left err -> do
                             reportError err
-                            fail $ "Aborting due to previous error"
+                            fail "Aborting due to previous error"
 
                         -- generate assembly
                         Right mod ->

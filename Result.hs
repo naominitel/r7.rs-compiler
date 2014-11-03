@@ -3,12 +3,10 @@ module Result
     Result(Failure, Pass),
 ) where
 
-import Error
-import Bytecode
 
 -- Result type used in several parts of the compiler. It is parameterized by
 -- 3 types:
---   * state represents the current state of a compiler pass (parsing or code 
+--   * state represents the current state of a compiler pass (parsing or code
 --     generation)
 --   * errs represents information about one or several errors
 --   * res represents the result of a successful compilation
@@ -40,15 +38,15 @@ instance (Errors errs, ResultType res) => Monad (Result errs res) where
         let cont = next st in
         case cont of
             Failure e s -> Failure (append errs e) s
-            Pass _ s -> Failure errs s
+            Pass _ s    -> Failure errs s
 
     Pass instrs st >>= next =
         let cont = next st in
         case cont of
-            Failure errs s -> cont
-            Pass i s -> Pass (combine instrs i) s
+            Failure _ _ -> cont
+            Pass i s    -> Pass (combine instrs i) s
 
-    return st = Pass new st
+    return = Pass new
 
 -- Allow use of the Result type with most-used compiler types
 

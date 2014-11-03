@@ -1,3 +1,4 @@
+{-# LANGUAGE ExistentialQuantification #-}
 module AST
 (
     AST(AST),
