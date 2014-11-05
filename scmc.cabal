@@ -20,6 +20,7 @@ Executable scmc
     ghc-options: -Wall -W -fwarn-incomplete-patterns -fwarn-tabs
         -fwarn-overlapping-patterns -fwarn-incomplete-record-updates
         -fwarn-monomorphism-restriction -fwarn-unused-do-bind
+        -fno-warn-missing-signatures -fno-warn-name-shadowing
 
     Build-depends:
         ansi-terminal -any,
