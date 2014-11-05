@@ -66,7 +66,7 @@ parseExpr :: TokenTree -> Either Error Expression
 
 parseExpr (TokNode (TokLeaf (TokLet p) : (TokNode bindings) : expr : [])) = do
     args <- letArgs bindings
-    ids <- letArgsIdentifiers args
+    ids  <- letArgsIdentifiers args
     vals <- letArgsValues args
     let lambda = TokNode $
             TokLeaf (TokLambda p) : (TokNode $ map TokLeaf ids) : expr : []
@@ -125,6 +125,9 @@ parseExpr (TokNode (func : args)) = do
     parsedArgs <- mapM parseExpr args
     Right $ Expr $ Apply parsedFunc parsedArgs
 
+parseExpr (TokNode []) =
+    fail "Empty application"
+
 -- Parsing for anything else, like "var" or "1"
 
 parseExpr (TokLeaf (TokBool b p))  = return $ Expr $ BoolConstant b p
@@ -137,13 +140,12 @@ parseExpr (TokLeaf t) =
 -- parse a library name
 
 parseLibname :: [TokenTree] -> Either Error LibName
-parseLibname [] = Right []
+parseLibname [] = fail "empty library name"
 parseLibname (TokLeaf (TokId s _) : []) = Right $ [s]
-parseLibname (TokLeaf (TokId s _) : r) = parseLibname r >>= Right . (:) s
+parseLibname (TokLeaf (TokId s _) : r)  = parseLibname r >>= Right . (:) s
 parseLibname (TokLeaf t : _) = Left $ Error
     ("unexpected token in library name: " ++ show t) (tokPos t)
-parseLibname (TokNode (TokLeaf t : _) : _) = Left $ Error
-    ("unexpected token in library name: " ++ show t) (tokPos t)
+parseLibname (TokNode _ : _) = fail "unexpected token in library name"
 
 -- parse a (define)
 
@@ -214,6 +216,11 @@ parseImports (TokNode (TokLeaf (TokImport p) : lst)) =
         Left err -> Left $ err
         Right [] -> Left $ Error "empty import set" p
         Right l  -> Right $ l
+
+parseImports (TokNode (TokLeaf t : _)) = Left $ Error
+    ("parse error: expected `import', but found: " ++ show t) (tokPos t)
+
+parseImports (TokNode _) = fail "malformed import list"
 
 parseImports (TokLeaf tok) = Left $ Error
     ("parse error: expected (import ... ), but found: " ++ show tok) (tokPos tok)
@@ -354,6 +361,14 @@ parseLibDecl (i@(TokNode (TokLeaf (TokImport _) : _)) : r) l = do
 parseLibDecl (TokNode (TokLeaf (TokBegin _) : b) : r) l =
     parseLibDecl r l >>= parseLibBegin b
 
+parseLibDecl (TokNode (TokLeaf t : _) : _) _ = Left $ Error
+    ("expected `import' or `begin' but found: " ++ show t) (tokPos t)
+
+parseLibDecl (TokNode _ : _) _ = fail "malformed library declaration"
+
+parseLibDecl (TokLeaf t : _) _ = Left $ Error
+    ("unexpected token: " ++ show t) (tokPos t)
+
 -- Parse a library definition.
 -- formal syntax:
 --   (library_definition) ->
@@ -365,6 +380,11 @@ parseLib :: [TokenTree] -> Either Error Library
 parseLib (TokNode ln : r) = do
     name <- parseLibname ln
     parseLibDecl r $ Library name [] []
+
+parseLib (TokLeaf t : _) = Left $ Error
+    ("unexpected token: " ++ show t) (tokPos t)
+
+parseLib [] = fail "malformed library definition"
 
 -- parser: entry point for the parser
 

@@ -14,6 +14,7 @@ data Quote = Quote Datum Pos
 
 compileDatum :: Datum -> State -> Result
 compileDatum (SimpleDatum constant) st = codegen constant st False
+compileDatum (ListDatum _) _ = fail "quoted lists are not implemented"
 
 instance Show Quote where
     show (Quote s _) = show s

@@ -18,6 +18,7 @@ instance Expand Begin where
         Begin $ map (expand ctxt) exprs
 
 instance CompileExpr Begin where
+    codegen (Begin []) st _ = Pass [] st
     codegen (Begin [Expr a]) st p = codegen a st p
     codegen (Begin (Expr a : rest)) (e, l) pos = do
         ret <- codegen a (e, l) False
