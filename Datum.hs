@@ -18,8 +18,7 @@ instance Show Datum where
     show (ListDatum dati) = show dati
 
 getDatum :: TokenTree -> Datum
-
-getDatum (TokLeaf (TokBool b p)) = SimpleDatum $ BoolConstant b p
-getDatum (TokLeaf (TokInt i p))  = SimpleDatum $ IntConstant i p
-getDatum (TokLeaf tok)  = SimpleDatum $ Symbol (show tok) (tokPos tok)
-getDatum (TokNode node) = ListDatum $ map getDatum node
+getDatum (Leaf (Bool b) p) = SimpleDatum $ BoolConstant b p
+getDatum (Leaf (Int i) p)  = SimpleDatum $ IntConstant i p
+getDatum (Leaf tok p)  = SimpleDatum $ Symbol (show tok) p
+getDatum (Node node _) = ListDatum $ map getDatum node

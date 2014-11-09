@@ -7,7 +7,7 @@ module Imports
 
 import Identifier
 
-type LibName = [String]
+type LibName = [Identifier]
 
 data Import
     = Lib LibName

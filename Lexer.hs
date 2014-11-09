@@ -3,41 +3,37 @@ module Lexer
 
     Token
     (
-        TokBegin,
-        TokBool,
-        TokClose,
-        TokDefine,
-        TokDeflib,
-        TokDot,
-        TokExcept,
-        TokId,
-        TokIf,
-        TokImport,
-        TokInt,
-        TokLambda,
-        TokLet,
-        TokOnly,
-        TokOpen,
-        TokPrefix,
-        TokQuote,
-        TokRename,
-        TokSet,
-        TokStr
+        Begin,
+        Bool,
+        Close,
+        Define,
+        Deflib,
+        Dot,
+        Except,
+        Id,
+        If,
+        Import,
+        Int,
+        Lambda,
+        Let,
+        Only,
+        Open,
+        Prefix,
+        Quote,
+        Rename,
+        Set,
+        Str
     ),
 
     lexer,
     program,
-    syntaxChecker,
-    tokPos
+    syntaxChecker
 ) where
 
 import Data.Word
 import Text.Regex.Posix
 
 import Error
-import Result
-
-type LexResult = Result [Error] [Token] ()
 
 -- Token: basic data structure for a program lexical unit.
 --  * Open is an opening brace '('
@@ -45,70 +41,48 @@ type LexResult = Result [Error] [Token] ()
 --  * others are any other identifier or token
 
 data Token
-    = TokBegin Pos
-    | TokBool Bool Pos
-    | TokClose Pos
-    | TokDefine Pos
-    | TokDeflib Pos
-    | TokDot Pos
-    | TokExcept Pos
-    | TokId String Pos
-    | TokIf Pos
-    | TokInt Word64 Pos
-    | TokImport Pos
-    | TokLambda Pos
-    | TokLet Pos
-    | TokOnly Pos
-    | TokOpen Pos
-    | TokPrefix Pos
-    | TokQuote Pos
-    | TokRename Pos
-    | TokSet Pos
-    | TokStr String Pos
+    = Begin
+    | Bool Bool
+    | Close
+    | Define
+    | Deflib
+    | Dot
+    | Except
+    | Id String
+    | If
+    | Int Word64
+    | Import
+    | Lambda
+    | Let
+    | Only
+    | Open
+    | Prefix
+    | Quote
+    | Rename
+    | Set
+    | Str String
 
 instance Show Token where
-    show (TokBegin _)   = "begin"
-    show (TokDefine _)  = "define"
-    show (TokDeflib _)  = "define-library"
-    show (TokExcept _)  = "except"
-    show (TokIf _)      = "if"
-    show (TokImport _)  = "import"
-    show (TokLambda _)  = "lambda"
-    show (TokLet _)     = "let"
-    show (TokOnly _)    = "only"
-    show (TokPrefix _)  = "prefix"
-    show (TokQuote _)   = "quote"
-    show (TokRename _)  = "rename"
-    show (TokSet _)     = "set!"
-    show (TokDot _)     = "."
-    show (TokOpen _)    = "("
-    show (TokClose _)   = ")"
-    show (TokBool b _)  = show b
-    show (TokInt i _)   = show i
-    show (TokStr s _)   = show s
-    show (TokId t _)    = t
-
-tokPos :: Token -> Pos
-tokPos (TokBegin pos)   = pos
-tokPos (TokBool _ pos)  = pos
-tokPos (TokClose pos)   = pos
-tokPos (TokDefine pos)  = pos
-tokPos (TokDeflib pos)  = pos
-tokPos (TokExcept pos)  = pos
-tokPos (TokDot pos)     = pos
-tokPos (TokId _ pos)    = pos
-tokPos (TokIf pos)      = pos
-tokPos (TokImport pos)  = pos
-tokPos (TokInt _ pos)   = pos
-tokPos (TokLambda pos)  = pos
-tokPos (TokLet pos)     = pos
-tokPos (TokOnly pos)    = pos
-tokPos (TokOpen pos)    = pos
-tokPos (TokPrefix pos)  = pos
-tokPos (TokQuote pos)   = pos
-tokPos (TokRename pos)  = pos
-tokPos (TokSet pos)     = pos
-tokPos (TokStr _ pos)   = pos
+    show Begin      = "begin"
+    show Define     = "define"
+    show Deflib     = "define-library"
+    show Except     = "except"
+    show If         = "if"
+    show Import     = "import"
+    show Lambda     = "lambda"
+    show Let        = "let"
+    show Only       = "only"
+    show Prefix     = "prefix"
+    show Quote      = "quote"
+    show Rename     = "rename"
+    show Set        = "set!"
+    show Dot        = "."
+    show Open       = "("
+    show Close      = ")"
+    show (Bool b)   = show b
+    show (Int i)    = show i
+    show (Str s)    = show s
+    show (Id t)     = t
 
 -- Program
 
@@ -157,73 +131,68 @@ string = "\"(\\.|[^\\\\\"])*\""
 
 -- Tokenize: core of the lexer, transforms the program into a token list
 
-tokenize :: (String, Pos) -> Either Error Token
+tokenize :: String -> Maybe Token
 
 -- Special tokens
 
-tokenize (".", p)              = Right $ TokDot p
-tokenize ("(", p)              = Right $ TokOpen p
-tokenize (")", p)              = Right $ TokClose p
+tokenize "."                  = Just $ Dot
+tokenize "("                  = Just $ Open
+tokenize ")"                  = Just $ Close
 
 -- Keywords
 
-tokenize ("begin", p)          = Right $ TokBegin p
-tokenize ("define", p)         = Right $ TokDefine p
-tokenize ("define-library", p) = Right $ TokDeflib p
-tokenize ("except", p)         = Right $ TokExcept p
-tokenize ("if", p)             = Right $ TokIf p
-tokenize ("import", p)         = Right $ TokImport p
-tokenize ("lambda", p)         = Right $ TokLambda p
-tokenize ("let", p)            = Right $ TokLet p
-tokenize ("only", p)           = Right $ TokOnly p
-tokenize ("prefix", p)         = Right $ TokPrefix p
-tokenize ("quote", p)          = Right $ TokQuote p
-tokenize ("rename", p)         = Right $ TokRename p
-tokenize ("set!", p)           = Right $ TokSet p
+tokenize "begin"              = Just $ Begin
+tokenize "define"             = Just $ Define
+tokenize "define-library"     = Just $ Deflib
+tokenize "except"             = Just $ Except
+tokenize "if"                 = Just $ If
+tokenize "import"             = Just $ Import
+tokenize "lambda"             = Just $ Lambda
+tokenize "let"                = Just $ Let
+tokenize "only"               = Just $ Only
+tokenize "prefix"             = Just $ Prefix
+tokenize "quote"              = Just $ Quote
+tokenize "rename"             = Just $ Rename
+tokenize "set!"               = Just $ Set
 
 -- Literals
 
-tokenize ("#t", p)             = Right $ TokBool True p
-tokenize ("#f", p)             = Right $ TokBool False p
-tokenize (s, p)
-    | s =~ integer             = Right $ TokInt (read s :: Word64) p
-    | s =~ string              = Right $ TokStr (read s :: String) p
-    | s =~ identifier          = Right $ TokId s p
-    | otherwise                = Left  $ Error ("Unknown token " ++ s) p
+tokenize "#t"                 = Just $ Bool True
+tokenize "#f"                 = Just $ Bool False
+tokenize s
+    | s =~ integer            = Just $ Int (read s :: Word64)
+    | s =~ string             = Just $ Str (read s :: String)
+    | s =~ identifier         = Just $ Id s
+    | otherwise               = Nothing
 
 -- Check if the pairs of parenthesis are correct
 
-syntaxChecker :: [Token] -> Pos -> Int -> Maybe [Error]
-
+syntaxChecker :: [(Token, Pos)] -> Pos -> Int -> Maybe [Error]
 syntaxChecker [] _ 0 = Nothing
-
-syntaxChecker [] p _ =
-    Just [Error "Unclosed parenthesis at end of input" p]
-
-syntaxChecker (TokOpen p : r) _ c = syntaxChecker r p (c + 1)
-
-syntaxChecker (TokClose p : r) lp c
+syntaxChecker [] p _ = Just [Error "Unclosed parenthesis at end of input" p]
+syntaxChecker ((Open, p) : r) _ c = syntaxChecker r p (c + 1)
+syntaxChecker ((Close, p) : r) lp c
     | c > 0 = syntaxChecker r lp (c - 1)
     | otherwise = Just [Error "Unexpected ')'" p]
-
 syntaxChecker (_ : r) p count = syntaxChecker r p count
 
 -- entry point for the lexer
 
-tokenizeList :: [(String, Pos)] -> Either [Error] [Token]
+tokenizeList :: [(String, Pos)] -> Either [Error] [(Token, Pos)]
 tokenizeList [] = Right []
-tokenizeList (h:t) =
+tokenizeList ((h, pos) : t) =
     case tokenize h of
-        Right tok ->
+        Just tok ->
             case tokenizeList t of
-                Right toks -> Right $ tok : toks
+                Right toks -> Right $ (tok, pos) : toks
                 Left errs  -> Left errs
-        Left err ->
+        Nothing ->
+            let err = Error ("Unknown token " ++ h) pos in
             case tokenizeList t of
                 Right _   -> Left [err]
                 Left errs -> Left $ err : errs
 
-lexer :: Program -> Either [Error] [Token]
+lexer :: Program -> Either [Error] [(Token, Pos)]
 lexer prog =
     let toks = cut prog in
     tokenizeList toks >>= \t ->

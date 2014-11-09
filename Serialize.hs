@@ -26,6 +26,7 @@ import Data.Word
 import System.IO
 
 import Bytecode
+import Identifier
 import Imports
 import Module
 
@@ -211,7 +212,7 @@ putLibName name = do
     let aux = \part ->
             case part of
                 [] -> return ()
-                str : t -> do
+                Identifier str _ : t -> do
                     let astr = BS.pack $ toAscii str
                     let slen = fromIntegral (BS.length astr) :: Word64
                     putWord64be slen

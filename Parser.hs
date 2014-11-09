@@ -8,6 +8,7 @@ module Parser
     parser
 ) where
 
+import Control.Monad (liftM)
 
 import Apply
 import Begin
@@ -20,7 +21,6 @@ import Identifier
 import If
 import Imports
 import Lambda
-import Lexer
 import Library
 import Module
 import Program
@@ -29,24 +29,27 @@ import Set
 import Syntax
 import Tree
 
+import qualified Lexer as L
+import Lexer (Token ())
+
 -- The parser first transforms the flat token list into a tree structure.
 -- Braces are removed, and any other token is a leaf or node of the tree.
 -- Any token has attached its contents and position in file
 
-arborize :: [Token] -> ([TokenTree], [Token])
+arborize :: [(Token, Pos)] -> ([TokenTree], [(Token, Pos)])
 
 arborize [] = ([], [])
 
-arborize (TokClose _:s) = ([], s)
+arborize ((L.Close, _) : s) = ([], s)
 
-arborize (TokOpen _:s) =
+arborize ((L.Open, p) : s) =
     let (rec, cont) = arborize s
         (next, end) = arborize cont
-    in (TokNode rec : next, end)
+    in (Node rec p : next, end)
 
-arborize (tok : s) =
+arborize ((tok, p) : s) =
     let (rec, cont) = arborize s
-    in (TokLeaf tok : rec, cont)
+    in (Leaf tok p : rec, cont)
 
 -- The parser now expand the tree into a typed data structures, replacing
 -- plain string lists by syntaxic elements of the core langage and
@@ -64,177 +67,167 @@ parseExpr :: TokenTree -> Either Error Expression
 -- Parsing for (let ((e1 v1) ... (en vn)) expr)
 --   -> ((lambda (e1 ... en) expr) v1 ... vn)
 
-parseExpr (TokNode (TokLeaf (TokLet p) : (TokNode bindings) : expr : [])) = do
-    args <- letArgs bindings
-    ids  <- letArgsIdentifiers args
-    vals <- letArgsValues args
-    let lambda = TokNode $
-            TokLeaf (TokLambda p) : (TokNode $ map TokLeaf ids) : expr : []
-    parseExpr $ TokNode (lambda : vals)
+parseExpr (Node [Leaf L.Let _, bindings, expr] p) = do
+    args <- letBindings bindings
+    let ids    = letArgsIdentifiers args
+    let vals   = letArgsValues args
+    let lambda = Node [Leaf L.Lambda p, Node (map (`Leaf` p) ids) p, expr] p
+    parseExpr $ Node (lambda : vals) p
 
-parseExpr (TokNode (TokLeaf (TokLet p) : _)) =
-    Left $ Error "Malformed let-expr" p
+parseExpr (Node (Leaf L.Let _ : _) p) = Left $ Error "Malformed let-expression" p
 
 -- Parsing for (lambda (e1 ... en) expr)
 
-parseExpr (TokNode (TokLeaf (TokLambda p) : (TokNode lst) : exprs)) = do
-    (args, var) <- lambdaArgs lst
-    body <- parseBody exprs
+parseExpr (Node (Leaf L.Lambda lp : args : exprs) p) = do
+    (args, var) <- lambdaArgs args
+    body <- parseBody exprs lp
     Right $ Expr $ Lambda args var body p
 
-parseExpr (TokNode (TokLeaf (TokLambda p) : _)) =
-    Left $ Error "Malformed lambda-expr" p
+parseExpr (Node (Leaf L.Lambda _ : _) p) =
+    Left $ Error "Malformed lambda-expression" p
 
 -- Parsing for (set! id val)
 
-parseExpr (TokNode (TokLeaf (TokSet _) : (TokLeaf (TokId i p)) : expr : [])) =
+parseExpr (Node [Leaf L.Set p, Leaf (L.Id i) _, expr] _) =
     parseExpr expr >>= \e -> return $ Expr $ Set i e p
 
-parseExpr (TokNode (TokLeaf (TokSet p) : _)) =
-    Left $ Error "Syntax error: malformed set!-expression" p
+parseExpr (Node (Leaf L.Set _ : Leaf (L.Id _) _ : _ : t : _) _) =
+    Left $ Error ("unexpected token " ++ first t) (ttPos t)
+
+parseExpr (Node [Leaf L.Set _, Leaf (L.Id _) p] _) =
+    Left $ Error ("expression expected after identifier") p
+
+parseExpr (Node (Leaf L.Set _ : t : _) _) =
+    Left $ Error ("expected an identifier, but found " ++ first t) (ttPos t)
+
+parseExpr (Node [Leaf L.Set p] _) =
+    Left $ Error "identifier expected after `set!'" p
 
 -- Parsing for (if expr-bool expr-if expr-else)
 
-parseExpr (TokNode (TokLeaf (TokIf p) : exprif : exprt : exprf : [])) = do
+parseExpr (Node [Leaf L.If p, exprif, exprt, exprf] _) = do
     parsedif <- parseExpr exprif
     parsedt <- parseExpr exprt
     parsedf <- parseExpr exprf
     Right $ Expr $ If parsedif parsedt parsedf p
 
-parseExpr (TokNode (TokLeaf (TokIf p) : _)) =
-    Left $ Error "Malformed if-expression" p
+parseExpr (Node (Leaf L.If _ : _ : _ : _ : t : _) _) =
+    Left $ Error ("unexpected token " ++ first t) (ttPos t)
+
+parseExpr (Node (Leaf L.If p : _) _) =
+    Left $ Error "not enough arguments to if-expression" p
 
 -- Parsing for (quote expr)
 
-parseExpr (TokNode (TokLeaf (TokQuote p) : expr : [])) =
+parseExpr (Node [Leaf L.Quote p, expr] _) =
     Right $ Expr $ Quote (getDatum expr) p
 
-parseExpr (TokNode (TokLeaf (TokQuote p) : _)) =
-    Left $ Error "Malformed quote-expression" p
+parseExpr (Node (Leaf L.Quote _ : _) p) =
+    Left $ Error "malformed quote-expression" p
 
 -- Parsing for (begin expr)
 
-parseExpr (TokNode (TokLeaf (TokBegin _) : exprs)) = do
+parseExpr (Node (Leaf L.Begin _ : exprs) _) = do
     parsedExprs <- mapM parseExpr exprs
     Right $ Expr $ Begin parsedExprs
 
 -- Parsing for function application (f a1 a2 a3)
 
-parseExpr (TokNode (func : args)) = do
+parseExpr (Node (func : args) _) = do
     parsedFunc <- parseExpr func
     parsedArgs <- mapM parseExpr args
     Right $ Expr $ Apply parsedFunc parsedArgs
 
-parseExpr (TokNode []) =
-    fail "Empty application"
+parseExpr (Node [] p) =
+    Left $ Error "empty application" p
 
 -- Parsing for anything else, like "var" or "1"
 
-parseExpr (TokLeaf (TokBool b p))  = return $ Expr $ BoolConstant b p
-parseExpr (TokLeaf (TokInt i p))   = return $ Expr $ IntConstant i p
-parseExpr (TokLeaf (TokId s p))    = return $ Expr $ Identifier s p
+parseExpr (Leaf (L.Bool b) p) = return $ Expr $ BoolConstant b p
+parseExpr (Leaf (L.Int i) p)  = return $ Expr $ IntConstant i p
+parseExpr (Leaf (L.Id s) p)   = return $ Expr $ Identifier s p
 
-parseExpr (TokLeaf t) =
-    Left $ Error ("expected an expression, but found: " ++ show t) (tokPos t)
+parseExpr (Leaf t p) =
+    Left $ Error ("expected an expression, but found: " ++ show t) p
+
+-- parse a list of identifiers
+
+parseIdentList :: [TokenTree] -> Pos -> Either Error [Identifier]
+
+parseIdentList [] p = Left $ Error "identifier list expected" p
+
+parseIdentList (Leaf (L.Id i) p : r) rp =
+    parseIdentList r rp >>= Right . (:) (Identifier i p)
+
+parseIdentList (t : _) _ =
+    Left $ Error ("expected identifier but found" ++ first t) (ttPos t)
 
 -- parse a library name
 
-parseLibname :: [TokenTree] -> Either Error LibName
-parseLibname [] = fail "empty library name"
-parseLibname (TokLeaf (TokId s _) : []) = Right $ [s]
-parseLibname (TokLeaf (TokId s _) : r)  = parseLibname r >>= Right . (:) s
-parseLibname (TokLeaf t : _) = Left $ Error
-    ("unexpected token in library name: " ++ show t) (tokPos t)
-parseLibname (TokNode _ : _) = fail "unexpected token in library name"
+parseLibname :: TokenTree -> Either Error LibName
+
+parseLibname (Leaf t p) =
+    Left $ Error ("expected library-name, but found " ++ show t) p
+
+parseLibname (Node [] p) =
+    Left $ Error "empty library-name" p
+
+parseLibname (Node l p) = parseIdentList l p
 
 -- parse a (define)
 
-parseDefine :: [TokenTree] -> Either Error Define
+parseDefine :: [TokenTree] -> Pos -> Either Error Define
+
+parseDefine [] p = Left $ Error "identifier expected after `define'" p
 
 -- parsing for (define id expr)
 
-parseDefine (TokLeaf (TokId i p) : expr : []) =
+parseDefine [Leaf (L.Id i) p, expr] _ =
     parseExpr expr >>= \e -> return $ Define i e p
+
+parseDefine (Leaf (L.Id _) _ : _ : t : _) _ =
+    Left $ Error ("unexpected token " ++ first t) (ttPos t)
+
+parseDefine [Leaf (L.Id _) p] _ =
+    Left $ Error ("expected expression after identifier") p
+
+parseDefine (Leaf t p : _) _ =
+    Left $ Error ("expected identifier or function but found " ++ show t) p
 
 -- Parsing for (define (id args) expr...) -> (define id (lambda (args)) expr)
 
-parseDefine (TokNode (TokLeaf (TokId i p) : args) : expr) = do
-    let lambda = (TokNode (TokLeaf (TokLambda p) : (TokNode args) : expr))
+parseDefine [Node (Leaf (L.Id _) _ : _) p] _ =
+    Left $ Error ("expected expression after function-name") p
+
+parseDefine (Node (Leaf (L.Id i) p : args) lp : expr) _ = do
+    let lambda = Node (Leaf L.Lambda p : Node args p : expr) lp
     parsedLambda <- parseExpr lambda
     Right $ Define i parsedLambda p
 
-parseDefine _ = fail $ "Malformed define expression"
+parseDefine (Node (t : _) _ : _) _ =
+    Left $ Error ("expected function-name but found " ++ first t) (ttPos t)
+
+parseDefine (Node [] p : _) _ =
+    Left $ Error "function-name expected" p
 
 -- parse a list of tokens where a (define ...)* (expr ...)+ is expected
 -- This is the body of a lambda expression and let expressions
 
-parseBody :: [TokenTree] -> Either Error Scope
+parseBody :: [TokenTree] -> Pos -> Either Error Scope
 
-parseBody [] = fail $ "Empty body"
+parseBody [] p = Left $ Error "expression expected" p
 
-parseBody (TokNode (TokLeaf (TokDefine p) : _) : []) = Left $
-    Error "No expression after definitions sequence" p
+parseBody [Node (Leaf L.Define p : _) _] _ =
+    Left $ Error "no expression after definitions sequence" p
 
-parseBody (TokNode (TokLeaf (TokDefine _) : d) : r) = do
-    def <- parseDefine d
-    scp <- parseBody r
+parseBody (Node (Leaf L.Define dp : d) _ : r) p = do
+    def <- parseDefine d dp
+    scp <- parseBody r p
     Right $ scopeAddDef scp def
 
-parseBody (_ : TokNode (TokLeaf (TokDefine p) : _) : _) = Left $
-    Error "expected command or expression, but found (define ... )" p
-
-parseBody (expr : []) =
-    (parseExpr expr) >>= \e -> Right $ Scope [] $ Begin [e]
-
-parseBody (expr : r) = do
-    exp <- parseExpr expr
-    scp <- parseBody r
-    Right $ scopeAddExpr scp exp
-
--- parse a set of imports forms that can occur at the beginning of a program
--- or a library, in an (import ... ) expression.
---   (import set) -> (import spec)+
-
-parseImportSet :: [TokenTree] -> Either Error Imports
-
-parseImportSet [] = Right $ []
-
-parseImportSet (TokNode t : []) = parseImp t >>= \t -> Right [t]
-
-parseImportSet (TokNode h : t) = do
-    rec <- parseImportSet t
-    imp <- parseImp h
-    Right $ imp : rec
-
-parseImportSet (TokLeaf t : _) = Left $ Error
-    ("parse error: expected an import specifier, but found: " ++ show t) (tokPos t)
-
-parseImports :: TokenTree -> Either Error Imports
-
-parseImports (TokNode (TokLeaf (TokImport p) : lst)) =
-    case parseImportSet lst of
-        Left err -> Left $ err
-        Right [] -> Left $ Error "empty import set" p
-        Right l  -> Right $ l
-
-parseImports (TokNode (TokLeaf t : _)) = Left $ Error
-    ("parse error: expected `import', but found: " ++ show t) (tokPos t)
-
-parseImports (TokNode _) = fail "malformed import list"
-
-parseImports (TokLeaf tok) = Left $ Error
-    ("parse error: expected (import ... ), but found: " ++ show tok) (tokPos tok)
-
--- parse a list of identifiers
-
-parseIdentList :: [TokenTree] -> Either Error [Identifier]
-
-parseIdentList [] = fail $ "Empty identifier list"
-
-parseIdentList (TokLeaf (TokId i p) : r) =
-    parseIdentList r >>= Right . (:) (Identifier i p)
-
-parseIdentList _ = fail $ "malformed identifier list"
+parseBody exprs _ = do
+    exprs <- mapM parseExpr exprs
+    Right $ Scope [] $ Begin exprs
 
 -- parse a single import specifier
 -- formal syntax:
@@ -245,52 +238,90 @@ parseIdentList _ = fail $ "malformed identifier list"
 --     (prefix (import set) (identifier)+)
 --     (rename (import set) ((identifier) (identifier))+)
 
-parseImp :: [TokenTree] -> Either Error Import
+parseImport :: TokenTree -> Either Error Import
 
-parseImp (TokLeaf (TokOnly _) : (TokNode imp) : ids) = do
-    i <- parseIdentList ids
-    n <- parseImp imp
+parseImport (Leaf t p) =
+    Left $ Error ("expected an import specifier, but found: " ++ show t) p
+
+parseImport (Node (Leaf L.Only _ : imp : ids) _) = do
+    i <- parseIdentList ids (ttPos imp)
+    n <- parseImport imp
     Right $ Only n i
 
-parseImp (TokLeaf (TokOnly p) : _) =
-    Left $ Error "malformed only expression" p
+parseImport (Node (Leaf L.Only p : _) _) = do
+    Left $ Error "not enough arguments to only-expression" p
 
-parseImp (TokLeaf (TokExcept _) : (TokNode imp) : ids) = do
-    i <- parseIdentList ids
-    n <- parseImp imp
+parseImport (Node (Leaf L.Except p : imp : ids) _) = do
+    i <- parseIdentList ids p
+    n <- parseImport imp
     Right $ Except n i
 
-parseImp (TokLeaf (TokExcept p) : _) =
+parseImport (Node (Leaf L.Except p : _) _) = do
     Left $ Error "malformed except expression" p
 
-parseImp (TokLeaf (TokPrefix _) : (TokNode imp) : ids) = do
-    i <- parseIdentList ids
-    n <- parseImp imp
+parseImport (Node (Leaf L.Prefix p : imp : ids) _) = do
+    i <- parseIdentList ids p
+    n <- parseImport imp
     Right $ Prefix n i
 
-parseImp (TokLeaf (TokPrefix p) : _) =
+parseImport (Node (Leaf L.Prefix p : _) _) = do
     Left $ Error "malformed except expression" p
 
-parseImp (TokLeaf (TokRename _) : (TokNode imp) : rns) =
-    let parseRenames l = case l of
-            [] -> fail $ "Empty rename list"
-            TokNode(TokLeaf (TokId i p1) : TokLeaf (TokId n p2) : []) : [] ->
+parseImport (Node (Leaf L.Rename p : imp : rns) _) =
+    let parseRenames l p = case l of
+            [] -> Left $ Error "rename-list expected" p
+            [Node [Leaf (L.Id i) p1, Leaf (L.Id n) p2] _] ->
                 Right $ [(Identifier i p1, Identifier n p2)]
-            TokNode(TokLeaf (TokId i p1) : TokLeaf (TokId n p2) : []) : r -> do
-                l <- parseRenames r
+            (Node [Leaf (L.Id i) p1, Leaf (L.Id n) p2] _ : r) -> do
+                l <- parseRenames r p
                 Right $ (Identifier i p1, Identifier n p2) : l
-            _ ->  fail $ "Malformed rename list"
+            (t : _) -> Left $ Error "malformed rename-list" (ttPos t)
     in do
-        n <- parseImp imp
-        l <- parseRenames rns
+        n <- parseImport imp
+        l <- parseRenames rns p
         Right $ Rename n l
 
-parseImp (TokLeaf (TokRename p) : _) =
+parseImport (Node (Leaf L.Rename p : _) _) = do
     Left $ Error "malformed rename expression" p
 
-parseImp [] = fail $ "malformed import"
+parseImport node = parseLibname node >>= Right . Imports.Lib
 
-parseImp lst = parseLibname lst >>= Right . Imports.Lib
+-- parse a set of imports forms that can occur at the beginning of a program
+-- or a library, in an (import ... ) expression.
+--   (import set) -> (import spec)+
+
+parseImports :: [TokenTree] -> Pos -> Either Error Imports
+
+parseImports [] p = Left $ Error "expected import specification" p
+
+parseImports [t] _ = parseImport t >>= \t -> Right [t]
+
+parseImports (h : t) p = do
+    rec <- parseImports t p
+    imp <- parseImport h
+    Right $ imp : rec
+
+-- parse a sequence of definitions or expressions
+
+parseCommandsOrDef :: [TokenTree] -> Either Error Program
+
+parseCommandsOrDef [Node (Leaf L.Define p : def) _] =
+    parseDefine def p >>= \d -> Right $ Program [] [Def d]
+
+parseCommandsOrDef (Node (Leaf L.Define p : def) _ : r) = do
+    def <- parseDefine def p
+    prog <- parseProgramBody r
+    Right $ progAddDef prog def
+
+parseCommandsOrDef [expr] =
+    parseExpr expr >>= \e -> Right $ Program [] [Cmd e]
+
+parseCommandsOrDef (expr : r) = do
+    e <- parseExpr expr
+    prog <- parseProgramBody r
+    Right $ progAddExpr prog e
+
+parseCommandsOrDef [] = Right $ Program [] []
 
 -- parse the body of a program or a library. It differs from the body of a
 -- lambda by allowing (import)+ (command or definition)+
@@ -304,43 +335,25 @@ parseProgramBody :: [TokenTree] -> Either Error Program
 
 parseProgramBody [] = fail $ "Empty program"
 
-parseProgramBody (TokNode (TokLeaf (TokImport p) : _) : []) = Left $
-    Error "no program after an import sequence" p
+parseProgramBody [Node (Leaf L.Import _ : _) p] =
+    Left $ Error "no program after an import sequence" p
 
-parseProgramBody (i@(TokNode (TokLeaf (TokImport _) : _)) : r) = do
-    set <- parseImports i
+parseProgramBody (Node (Leaf L.Import p : imports) _ : r) = do
+    set <- parseImports imports p
     prog <- parseProgramBody r
     Right $ progAddImp prog set
 
-parseProgramBody (_ : TokNode (TokLeaf (TokImport p) : _) : _) = Left $
-    Error "expected command or definition, but found (import ... )" p
+parseProgramBody exprs = parseCommandsOrDef exprs
 
-parseProgramBody (def : []) = case def of
-    TokNode (TokLeaf (TokDefine _) : d) ->
-        parseDefine d >>= \d -> Right $ Program [] [Def d]
-    expr ->
-        parseExpr expr >>= \e -> Right $ Program [] [Cmd e]
-
-parseProgramBody (def : r) = case def of
-    TokNode (TokLeaf (TokDefine _) : d) -> do
-        def <- parseDefine d
-        prog <- parseProgramBody r
-        Right $ progAddDef prog def
-    expr -> do
-        e <- parseExpr expr
-        prog <- parseProgramBody r
-        Right $ progAddExpr prog e
-
--- Parse a library declaration
--- formal syntax:
---   (library_declaration) ->
+-- In the context of a library declaration, a begin expression groups several
+-- commands (expressions whose result is unused) and definitions
 
 parseLibBegin :: [TokenTree] -> Library -> Either Error Library
 
 parseLibBegin [] l = Right l
 
-parseLibBegin (TokNode (TokLeaf (TokDefine _) : d) : r) l = do
-    def <- parseDefine d
+parseLibBegin (Node (Leaf L.Define p : d) _ : r) l = do
+    def <- parseDefine d p
     lib <- parseLibBegin r l
     Right $ libAddDef lib def
 
@@ -349,61 +362,46 @@ parseLibBegin (expr : r) l = do
     lib <- parseLibBegin r l
     Right $ libAddExpr lib e
 
+-- Parse a sequence of library declarations
+-- Currently supported library declarations are import specifications or begin
+-- declaration (see above)
+
 parseLibDecl :: [TokenTree] -> Library -> Either Error Library
 
 parseLibDecl [] l = Right $ l
 
-parseLibDecl (i@(TokNode (TokLeaf (TokImport _) : _)) : r) l = do
+parseLibDecl (Node (Leaf L.Import p : imports) _ : r) l = do
     lib <- parseLibDecl r l
-    imp <- parseImports i
+    imp <- parseImports imports p
     Right $ libAddImp lib imp
 
-parseLibDecl (TokNode (TokLeaf (TokBegin _) : b) : r) l =
+parseLibDecl (Node (Leaf L.Begin _ : b) _ : r) l =
     parseLibDecl r l >>= parseLibBegin b
 
-parseLibDecl (TokNode (TokLeaf t : _) : _) _ = Left $ Error
-    ("expected `import' or `begin' but found: " ++ show t) (tokPos t)
+parseLibDecl (Node (t : _) _ : _) _ = Left $ Error
+    ("expected `import' or `begin' but found: " ++ first t) (ttPos t)
 
-parseLibDecl (TokNode _ : _) _ = fail "malformed library declaration"
+parseLibDecl (Node [] p : _) _ = Left $ Error
+    ("expected `import' or `begin'") p
 
-parseLibDecl (TokLeaf t : _) _ = Left $ Error
-    ("unexpected token: " ++ show t) (tokPos t)
-
--- Parse a library definition.
--- formal syntax:
---   (library_definition) ->
---     (library name)
---     (library_declaration)*
-
-parseLib :: [TokenTree] -> Either Error Library
-
-parseLib (TokNode ln : r) = do
-    name <- parseLibname ln
-    parseLibDecl r $ Library name [] []
-
-parseLib (TokLeaf t : _) = Left $ Error
-    ("unexpected token: " ++ show t) (tokPos t)
-
-parseLib [] = fail "malformed library definition"
+parseLibDecl (Leaf t p : _) _ =
+    Left $ Error ("unexpected token: " ++ show t) p
 
 -- parser: entry point for the parser
 
 parseProgramOrLibrary :: [TokenTree] -> Either Error Module
 
-parseProgramOrLibrary [] = fail $ "Empty program"
+parseProgramOrLibrary (Node (Leaf L.Deflib _ : name : decls) _ : _) = do
+    name <- parseLibname name
+    liftM Module.Lib $ parseLibDecl decls $ Library name [] []
 
-parseProgramOrLibrary (i@(TokNode (TokLeaf (TokImport _) : _)) : r) = do
-    set <- parseImports i
-    prog <- parseProgramBody r
-    Right $ Prog $ progAddImp prog set
-
-parseProgramOrLibrary (TokNode (TokLeaf (TokDeflib _) : l) : _) =
-    parseLib l >>= \lib -> Right $ Module.Lib $ lib
+parseProgramOrLibrary (Node [Leaf L.Deflib p] _ : _) =
+    Left $ Error "expected library name after `define-library'" p
 
 parseProgramOrLibrary t =
     parseProgramBody t >>= \p -> Right $ Prog p
 
-parser :: [Token] -> Either Error Module
+parser :: [(Token, Pos)] -> Either Error Module
 
 parser tokens =
     case arborize tokens of
